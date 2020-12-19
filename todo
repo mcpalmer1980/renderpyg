@@ -1,0 +1,29 @@
+TILEMAP:
+implement smoothing
+background renderer
+add renderer to tilemap class?
+get/set 
+overrides
+get transform
+
+ANIMATION:
+animation parameter documentation
+keyframe verification
+easing
+naming
+origin
+
+BASE:
+fetch_images from rects
+load_xml sprite format
+
+NINEPATCH:
+surround()
+
+TFONT:
+return rect area
+
+ADD:
+transitions
+menu
+text input
