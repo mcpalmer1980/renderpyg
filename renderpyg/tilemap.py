@@ -36,7 +36,7 @@ printfo = 'hello'
 try:
 	import pytmx
 	_PYTMX = True
-except:
+except ImportError:
 	_PYTMX = False
 
 
@@ -195,7 +195,7 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 		renderer.target = buffer
 		renderer.clear()
 
-	dstrect = kwargs.get('dstrect', None)
+	dstrect = kwargs.get('dstrect')
 	try:
 		if dstrect:
 			if not hasattr(dstrect, 'width'):
@@ -203,7 +203,7 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 			renderer.set_viewport(dstrect)
 			rend_width = dstrect.width
 			rend_height = dstrect.height
-	except:
+	except Exception as e:
 		raise ValueError(
 			'render_tilemap() cannot parse "{}" as dest_rect'.format(dstrect))
 
@@ -216,13 +216,13 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 			center = False
 		elif srcrect:
 			srcrect = pg.Rect(srcrect)
-	except:
+	except Exception as e:
 		raise ValueError(
 			'render_tilemap() cannot parse "{}" as src_rect'.format(dstrect))
 
 	center = kwargs.get('center', False)
 	try:
-		if center and center != True:
+		if center:
 			cam_x = int(center[0])
 			cam_y = int(center[1])
 			center = True
@@ -234,8 +234,8 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 		cam_x = (cam_x*scale) - (rend_width / 2)
 		cam_y =  (cam_y*scale) - (rend_height / 2)
 	else:
-		cam_x = cam_x * scale
-		cam_y = cam_y * scale
+		cam_x *= scale
+		cam_y *= scale
 
 	'''
 	Prepare to render the tilemap
