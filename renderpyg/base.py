@@ -30,7 +30,7 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 	Returns an image list generated from a given texture and either the
 	image size or the number of images in a sprite sheet.
 
-	:param textue: texture to fetch images from
+	:param texture: texture to fetch images from
 	:param width: width of images, or number of columns if by_count=True
 	:param height: height of images, or number of rows if by_count=True
 	:param spacing: space between each image in the texture
@@ -40,7 +40,7 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 	:rvalue: list of pygame._sdl2.video.Image objects
 	'''
 	tex_width, tex_height = texture.get_rect().size
-	if type(texture) == Image:
+	if isinstance(texture, Image):
 		marginx = margin + image.srcrect.x
 		marginy = margin + image.srcrect.y
 	else:
@@ -73,8 +73,8 @@ def load_texture(renderer, filename):
 	'''
 	try:
 		surf = pg.image.load(str(filename))
-	except:
-		raise FileNotFoundError('cannot open: ', filename)
+	except Exception as e:
+		raise FileNotFoundError(f'[Error] {type(e).__name__}: cannot open: {filename}')
 	return Texture.from_surface(renderer, surf)
 
 
@@ -122,7 +122,7 @@ def scale_rect_ip(rect, amount):
 	:rvalue None:
 	"""
 	c = rect.center
-	rect.width = rect.width * amount
-	rect.height = rect.height * amount
+	rect.width *= amount
+	rect.height *= amount
 	rect.center = c
 	return rect
