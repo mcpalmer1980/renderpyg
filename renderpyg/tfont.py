@@ -196,13 +196,13 @@ class NinePatch():
 		:param area: optional Rect area of texture to use, overrides
 			srcrect when source Image is used
 		'''
-		if type(source) == Texture:
+		if isinstance(source, Texture):
 			self.texture = source
-		elif type(source) == Image:
+		elif isinstance(source, Image):
 			self.texture = source.texture
 			area = area or source.srcrect
 
-		elif hasattr(source, '__len__') and type(source[0]) == Renderer:
+		elif hasattr(source, '__len__') and isinstance(source[0], Renderer):
 			self.texture = load_texture(source[0], source[1])
 		else:
 			raise ValueError(
@@ -355,7 +355,7 @@ def main():
 		else:
 			y = 20
 			for i, item in enumerate(example_list):
-				if i==selected:
+				if i == selected:
 					tfont.animate(
 						item, center, y, center=True, **examples[item])
 				else:
