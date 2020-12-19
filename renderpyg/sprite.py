@@ -26,6 +26,7 @@ import pygame as pg
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from .base import load_images, load_texture, fetch_images
 
+
 def GPUGroupDraw(self, surface=None):
 	"""
 	Draws all of the member sprites into their attached renderer.
@@ -40,7 +41,9 @@ def GPUGroupDraw(self, surface=None):
 	for spr in sprites:
 		self.spritedict[spr] = spr.image.draw(dstrect=spr.dest_rect)
 	self.lostsprites = []
+
 pg.sprite.AbstractGroup.draw = GPUGroupDraw
+
 
 class GPUAniSprite(pg.sprite.Sprite):
 	"""
@@ -64,18 +67,18 @@ class GPUAniSprite(pg.sprite.Sprite):
 			grid
 		"""
 		pg.sprite.Sprite.__init__(self)
-		if type(source) == Texture:
+		if isinstance(source, Texture):
 			self.images = fetch_images(source, width, height, **kwargs)
-		elif hasattr(source, '__len__') and type(source[0]) == Renderer:
+		elif hasattr(source, '__len__') and isinstance(source[0], Renderer):
 			self.images = load_images(
 				source[0], source[1], width, height, **kwargs)
-		elif hasattr(source, '__len__') and type(source[0]) == Image:
+		elif hasattr(source, '__len__') and isinstance(source[0], Image):
 			self.images = []
 			for image in source:
 				self.images.append(Image(image))
 		else:
 			raise ValueError(
-				'Cannot parse {} as source of GPUAniSPrite'.format(source))
+				f'Cannot parse {source} as source of GPUAniSPrite')
 
 		self.names = {}
 		self.x = 0
@@ -90,9 +93,9 @@ class GPUAniSprite(pg.sprite.Sprite):
 		self.event_queue = []
 		self.anim_queue = []
 		self.speed = 1
-		self.set_anchor(kwargs.get('anchor', None))
-		self.set_hitbox(kwargs.get('hitbox', None))
-		self.set_transform(kwargs.get('transform', None))
+		self.set_anchor(kwargs.get('anchor'))  # .get() defaults to None
+		self.set_hitbox(kwargs.get('hitbox'))
+		self.set_transform(kwargs.get('transform'))
 		self.velocity = None
 		self.rotation = None
 		self.scaling = None
@@ -159,7 +162,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 		self.anim_frame += 1
 		try:
 			anim_length = len(self.anim_frames)
-		except:
+		except Exception as e:
+                        print(f"[Error] {type(e).__name__}: {e}")
 			return
 
 		set_frame = False
@@ -275,11 +279,12 @@ class GPUAniSprite(pg.sprite.Sprite):
 		self.frame = self.names.get(frame, int(frame))
 		try:
 			self.image = self.images[self.frame]
-		except:
+		except Exception as e:
+                        print(f"[Error] {type(e).__name__}: {e}")
 			self.image = self.images[0]
 		self.duration = duration
-		angle = kwargs.get('angle', None) 
-		self.angle = angle if angle != None else self.angle
+		angle = kwargs.get('angle') 
+		self.angle = angle or self.angle
 		self.image.flipX = kwargs.get('flipx', False)
 		self.image.flipY = kwargs.get('flipy', False)
 		self.image.color = pg.color.Color(
@@ -288,7 +293,7 @@ class GPUAniSprite(pg.sprite.Sprite):
 				kwargs.get('alpha', 255))
 		self.scale = kwargs.get('scale', 1)
 		self.pos = kwargs.get('pos', pg.Vector2())
-		
+
 		if 'velocity' in kwargs:
 			self.velocity = kwargs['velocity']
 		if 'rotation' in kwargs:
@@ -332,7 +337,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.rect = box
 			self.rect.x = 0
 			self.rect.y = 0
-		except:
+		except Exception as e:
+                        print(f"[Error] {type(e).__name__}: {e}")
 			self.hit_anchor = None	
 
 	def set_pos(self, x, y=None):
@@ -343,7 +349,7 @@ class GPUAniSprite(pg.sprite.Sprite):
 		:param y: y cordinate if (x,y) pair and Vector2 not used
 		:rvalue None:
 		"""
-		if y == None:
+		if y is None:
 			x, y = x
 		self.x = x
 		self.y = y
@@ -368,7 +374,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 		try:
 			if len(transform) == 3:
 				self.transform = transform
-		except:
+		except Exception as e:
+                        print(f"[Error] {type(e).__name__}: {e}")
 			self.transform = pg.Vector3()
 
 	def stop(self):
