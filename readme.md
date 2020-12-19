@@ -16,7 +16,7 @@ The design of renderpyg is meant to be accessible by beginners so they may focus
 - Simple menuing system (soon)
 - Screen transitions (soon)
 
-##Installation Notes
+## Installation Notes
 pip install .  
 python setup.py install --user  
 python3 setup.py install --user  
@@ -125,9 +125,9 @@ Set sdl2 for anisotropic filtering:
 		FONT = EXAMPLE_DATA+'font.ttf' 
 		FONT_SIZE = 72
 		SPRITE_COUNT = 30
-        FONT_PARAMS = dict(
-            text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
-            circle=3, rotate=15, scale=.25, colors=(75,0,0))
+		FONT_PARAMS = dict(
+			text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
+			circle=3, rotate=15, scale=.25, colors=(75,0,0))
 
 		def main():
 			FULLSCREEN = False
