@@ -74,7 +74,8 @@ class TextureFont():
 		self.texture.alpha = alpha or 255
 		self.texture.color = color if color else (255,255,255,0)
 		if center:
-			dest.left -= self.Width(text) // 2
+			dest.left -= self.width(text) // 2
+			dest.top -= self.height // 2
 		for c in text:
 			src = self.cmap.get(c, self.blank)
 			dest.width = src.width
@@ -218,6 +219,8 @@ class NinePatch():
 		:param target: rect area to draw nine patch into
 		:rvalue None:
 		'''
+		if not isinstance(target, pg.Rect):
+			target = pg.Rect(target)
 		target.width = max(target.width, self.left+self.right+1)
 		target.height = max(target.height, self.top+self.bottom+1)
 		bounds = self.area
@@ -268,105 +271,6 @@ class NinePatch():
 					self.right, self.bottom),
 			dstrect=(target.right-self.right, target.bottom-self.bottom,
 					self.right, self.bottom) )
-
-
-def main():
-	os.environ['SDL_RENDER_SCALE_QUALITY'] = '2'
-	example_data = os.path.join(os.path.dirname(__file__), 'data', '')
-	examples = {
-			'Radiantly Red': dict(color=(220,0,0), colors=(-100,0,0),
-					circle=3, scale=5, duration=5000, rotate=25, variance=10),
-			'Blistering Blue': dict(color=(0,0,255), move=(8,0), fade=200,
-					spread=25, duration=200),
-			'Vividly Violet': dict(color=(238,130,238), colors=(-30,-30,-30),
-					move=(10,10), rotate=5, scale=5, duration=3000),
-			'Garishly Green': dict(color=(0,100,0), colors=(0,-50,0), scale=20,
-					duration=5000, variance=33),
-			'Whispy White': dict(color=(255,255,255), fade=100, circle=10,
-					variance=5, duration=9000)
-			}
-	default = dict(color=(255,255,0), move=(5,2), rotate=4, duration=3000)
-	example_list = list(examples.keys())
-
-	kwargs = dict(x.split('=', 1)[:2] for x in [
-			arg for arg in sys.argv[1:] if '=' in arg])
-	for k, v in kwargs.items():
-		if ',' in v:
-			v = eval(f'({v})')
-		else:
-			try:
-				v = float(v)
-			except:
-				try:
-					v = int(v)
-				except:
-					pass
-		kwargs[k] = v
-	params = {'text': 'Dancing Font!', 'color': (255,255,255)}
-	params.update(**kwargs)
-
-	pg.init()
-	clock = pg.time.Clock()
-	window = kwargs.get('window', (900, 600))
-	window = Window("TextureFont test", size=window)
-	center = 450
-	renderer = Renderer(window, vsync=True)
-	size = kwargs.get('size', 60)
-	font = kwargs.get('font', 'font.ttf')
-	tfont = TextureFont(renderer, example_data+font, int(size))
-
-	patch1 = (52,52,52,52), (0,0,320,172)
-	patch2 = (40,40,40,40), (0,177,320,223)
-	patch3 = (40,40,40,40), (0,404,320,160)
-	texture = load_texture(renderer, example_data+'nine.png')
-	nine = NinePatch(texture, *patch3)
-	
-	if len(sys.argv) > 1:
-		window.size = tfont.width(params['text']) * 1.25, tfont.height * 1.25
-		center = window.size[0] // 2
-		y = int(tfont.height * .125)
-
-	selected = 0
-	running = True
-	while running:
-		for event in pg.event.get():
-			if event.type == pg.QUIT:
-				running = False
-			elif event.type == pg.KEYDOWN:
-				if event.key == pg.K_UP:
-					selected -= 1
-					if selected < 0:
-						selected = len(examples) - 1
-				elif event.key == pg.K_DOWN:
-					selected += 1
-					if selected >= len(examples):
-						selected = 0
-				else:
-					running = False
-
-		renderer.draw_color = (0,0,0,255) 
-		renderer.clear()
-
-		x, y = pg.mouse.get_pos()
-		nine.draw(pg.Rect(10,10,x-10,y-10))
-
-		if len(sys.argv) > 1:
-			tfont.animate(x=center, y=y,center=True, **params)
-		else:
-			y = 20
-			for i, item in enumerate(example_list):
-				if i==selected:
-					tfont.animate(
-						item, center, y, center=True, **examples[item])
-				else:
-					tfont.animate(item, center, y, center=True, **default)
-				y += tfont.height * 1.25
-
-		renderer.present()
-		clock.tick(30)
-
-if __name__ == '__main__':
-	main()
 
 
 

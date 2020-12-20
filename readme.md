@@ -1,5 +1,6 @@
 # renderpyg
 ![](./renderpyg/docs/banner.png)
+
 ## A pygame add-on for GPU texture rendering
 
 Renderpyg is a python package that provides common game engine components for pygame. It utilize the experimental GPU accelerated texture renderer provided with pygame2 and will be updated to use the official sdl2.video API whenever it gets released. This version is written in pure python but later versions may be optimized in cython.
@@ -125,9 +126,9 @@ Set sdl2 for anisotropic filtering:
 		FONT = EXAMPLE_DATA+'font.ttf' 
 		FONT_SIZE = 72
 		SPRITE_COUNT = 30
-		FONT_PARAMS = dict(
-			text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
-			circle=3, rotate=15, scale=.25, colors=(75,0,0))
+        FONT_PARAMS = dict(
+            text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
+            circle=3, rotate=15, scale=.25, colors=(75,0,0))
 
 		def main():
 			FULLSCREEN = False
