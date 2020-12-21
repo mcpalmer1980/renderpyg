@@ -689,7 +689,7 @@ Draw pytmx or inbuilt tilemap onto pygame GPU renderer
 - *clamp*:  True to adjust camera to fit world coordinates
 - *rvalue*:  (camx, camy, scale) for adjusting other images
 
-##Disclaimer
+## Disclaimer  
 Copyright (C) 2020, Michael C Palmer <michaelcpalmer1980@gmail.com>
 
 This file is part of renderpyg
