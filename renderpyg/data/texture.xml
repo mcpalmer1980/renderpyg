@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Created with Free texture packer v0.6.6 http://free-tex-packer.com
+Format:
+n  => name
+x  => x pos
+y  => y pos
+w  => width
+h  => height
+pX => x pos of the pivot point
+pY => y pos of the pivot point
+oX => x-corner offset
+oY => y-corner offset
+oW => original width
+oH => original height
+r => 'y' if sprite is rotated-->
+<TextureAtlas imagePath="texture.png" width="1024" height="1024" scale="1" format="RGBA8888">
+  <sprite n="tile000.png" x="0" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile001.png" x="0" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile002.png" x="0" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile003.png" x="0" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile004.png" x="0" y="448" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile005.png" x="0" y="560" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile006.png" x="0" y="672" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile007.png" x="0" y="784" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile008.png" x="0" y="896" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile009.png" x="112" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile010.png" x="224" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile011.png" x="336" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile012.png" x="448" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile013.png" x="560" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile014.png" x="672" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile015.png" x="784" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile016.png" x="896" y="0" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile017.png" x="112" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile018.png" x="112" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile019.png" x="112" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile020.png" x="112" y="448" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile021.png" x="112" y="560" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile022.png" x="112" y="672" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile023.png" x="112" y="784" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile024.png" x="112" y="896" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile025.png" x="224" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile026.png" x="336" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile027.png" x="448" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile028.png" x="560" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile029.png" x="672" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile030.png" x="784" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile031.png" x="896" y="112" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile032.png" x="224" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile033.png" x="224" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile034.png" x="224" y="448" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile035.png" x="224" y="560" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile036.png" x="224" y="672" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile037.png" x="224" y="784" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile038.png" x="224" y="896" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile039.png" x="336" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile040.png" x="448" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile041.png" x="560" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile042.png" x="672" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile043.png" x="784" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile044.png" x="896" y="224" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile045.png" x="336" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile046.png" x="336" y="448" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile047.png" x="336" y="560" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile048.png" x="336" y="672" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile049.png" x="336" y="784" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile050.png" x="336" y="896" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile051.png" x="448" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile052.png" x="560" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile053.png" x="672" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile054.png" x="784" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+  <sprite n="tile055.png" x="896" y="336" w="112" h="112" pX="0.5" pY="0.5"/>
+</TextureAtlas>

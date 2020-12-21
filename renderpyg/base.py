@@ -1,4 +1,4 @@
-'''
+"""
 base.py: basic texture handling
 
 Loads textures from image files and creates Image objects.
@@ -21,12 +21,14 @@ You should have received a copy of the GNU Lesser General Public
 License along with renderpyg.
 
 If not, see <http://www.gnu.org/licenses/>.
-'''
+"""
 import pygame as pg
 from pygame._sdl2 import Renderer, Texture, Image
 
+loaded_textures = {}
+
 def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
-	'''
+	"""
 	Returns an image list generated from a given texture and either the
 	image size or the number of images in a sprite sheet.
 
@@ -38,7 +40,7 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 	:param by_count: set True to use width and height value to
 		calculate frame size from width and height of spritesheet
 	:rvalue: list of pygame._sdl2.video.Image objects
-	'''
+	"""
 	tex_width, tex_height = texture.get_rect().size
 	if type(texture) == Image:
 		marginx = margin + image.srcrect.x
@@ -62,15 +64,59 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 	return tiles
 
 
-def load_texture(renderer, filename):
+def load_xml_images(renderer, filename, _filter=[], by_name=False):
 	'''
+	Load images from a TextureAtlas XML file. Images may be filtered
+	and are return in a list, or optionally, a dict images indexed by
+	the name found in the xml file.
+
+	:param renderer: renderer to attach texture to
+	:param filename: path to a valid TextureAtlas XML file
+	:param fiter: list of file names or numbers to include in the list
+	:param by_name: set true to return a dict with image names
+	:rvalue: list of images as ordered in filename by default
+		optionally returns dict with image names instead
+	'''
+	import xml.etree.ElementTree as ET
+	import os
+
+	root = ET.parse(filename).getroot()
+	if root.tag != 'TextureAtlas':
+		raise ValueError("'{}' is not a TextureAtlas XML file".format(filename))
+
+	path = os.path.join(os.path.dirname(filename), root.attrib['imagePath'])
+	if path in loaded_textures.get(renderer, {}):
+		texture = loaded_textures[renderer][path]
+	else:
+		texture = load_texture(renderer, path)
+		if renderer not in loaded_textures:
+			loaded_textures[renderer] = {}
+		loaded_textures[renderer][path] = texture
+
+	numbers = []
+	names = {}
+	for n, child in enumerate(root):
+		if not _filter or n in _filter or child.attrib.get('n') in _filter:
+			rect = pg.Rect(
+				int(child.attrib['x']), int(child.attrib['y']),
+				int(child.attrib['w']), int(child.attrib['h']))
+			img = Image(texture)
+			img.srcrect = rect
+			numbers.append(img)
+			names[child.attrib.get('n')] = img
+
+	return names if by_name else numbers
+
+
+def load_texture(renderer, filename):
+	"""
 	Returns an texture loaded from given image file and attached to
 	given renderer.
 
 	:param renderer: active pygame._sdl2.video.Renderer object
 	:param filename: path to image file
 	:rvalue: texture object
-	'''
+	"""
 	try:
 		surf = pg.image.load(str(filename))
 	except:
@@ -80,12 +126,12 @@ def load_texture(renderer, filename):
 
 def load_images(
 		renderer, filename, width, height, spacing=0, margin=0, by_count=False):
-	'''
+	"""
 	Load a texture from given image file and generate a series of
 	images from it with the given width and height.
 
 	:param renderer: renderer object for loading texture into
-	:param filename: name of image file to load
+	:param filename: name of image file to load or xml file to process
 	:param width: width of each image, or column count if by_count=True
 	:param height: height of each cell, or row count if by_count=True
 	:param spacing: space between each tile of the image
@@ -93,7 +139,9 @@ def load_images(
 	:param by_count: set True to use width and height value to
 		calculate frame size from width and height of spritesheet
 	:rvalue: list of pygame._sdl2.video.Image objects
-	'''
+	"""
+	if filename.endswith('.xml'):
+		self.fetch_xml_images(texture, filename)
 	texture = load_texture(renderer, filename)
 	return fetch_images(texture, width, height, spacing, margin, by_count)
 

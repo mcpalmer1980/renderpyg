@@ -24,7 +24,7 @@ If not, see <http://www.gnu.org/licenses/>.
 '''
 import pygame as pg
 from pygame._sdl2.video import Window, Renderer, Texture, Image
-from .base import load_images, load_texture, fetch_images
+from .base import load_images, load_texture, fetch_images, load_xml_images
 
 def GPUGroupDraw(self, surface=None):
 	"""
@@ -53,8 +53,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 		"""
 		Create animated sprite object
 
-		:param source: texture, image, or (renderer, filename) pair to
-			load image from
+		:param source: texture, image list, or a (renderer, filename) pair to
+			load images an from image file or TextureAtlas XML
 		:param width: width of each animation frames
 		:param height: height of each animation frame
 		:param spacing: space between each animation frame
@@ -64,18 +64,27 @@ class GPUAniSprite(pg.sprite.Sprite):
 			grid
 		"""
 		pg.sprite.Sprite.__init__(self)
-		if type(source) == Texture:
+		if isinstance(source, Texture):
 			self.images = fetch_images(source, width, height, **kwargs)
-		elif hasattr(source, '__len__') and type(source[0]) == Renderer:
-			self.images = load_images(
-				source[0], source[1], width, height, **kwargs)
-		elif hasattr(source, '__len__') and type(source[0]) == Image:
-			self.images = []
-			for image in source:
-				self.images.append(Image(image))
 		else:
-			raise ValueError(
-				'Cannot parse {} as source of GPUAniSPrite'.format(source))
+			try:
+				iter(source)
+			except Exception:
+				raise ValueError(
+					'Cannot parse {} as source of GPUAniSPrite'.format(source))
+			if isinstance(source[0], Renderer):
+				if source[1].endswith('.xml'):
+					self.images = load_xml_images(source[0], source[1])
+				else:
+					self.images = load_images(
+						source[0], source[1], width, height, **kwargs)
+			elif isinstance(source[0], Image):
+				self.images = []
+				for image in source:
+					self.images.append(Image(image))
+			else:
+				raise ValueError(
+					'Cannot parse {} as source of GPUAniSPrite'.format(source))
 
 		self.names = {}
 		self.x = 0
@@ -484,92 +493,3 @@ def keyrange(start, end, duration=1000, **kwargs):
 		kwargs.update(frame=fr, duration=duration)
 		frame_list.append(kwargs.copy())
 	return frame_list
-
-l = list(range(11,20))
-anim1 = keyframes(l, 500, velocity=(15,0), rotation=30)
-anim2 = [
-	keyfr(11, 500),
-	keyfr(12, 500),
-	keyfr(13, 500) ]
-
-def main():
-	import os, sys, math
-	from .tfont import TextureFont
-	example_data = os.path.join(os.path.dirname(__file__), 'data', '')
-
-	pg.init()
-	window = Window('Testing', (1600,900))
-	renderer = Renderer(window)
-	clock = pg.time.Clock()
-	running = True
-	tfont = TextureFont(renderer, None, 48)
-
-	transform = pg.Vector3()
-	group = pg.sprite.Group()
-	texture = load_texture(renderer, example_data+'sprite.png')
-	for x in range(5):
-		sprite = GPUAniSprite(texture, 10,14,by_count=True)
-		sprite.set_animation(anim1, loop_type='back_forth', loop_count=-3)
-		sprite.set_pos(200, 100*x)
-		sprite.speed = .5 + (.25*x)
-		group.add(sprite)
-	sprite.speed = -1
-	sprite = GPUAniSprite(sprite.images, 10,14,by_count=True)
-	sprite.set_pos(500,20)
-	sprite.set_animation(anim2, loop_type='forward', loop_count=-1)
-	sprite.set_hitbox((50,50,25,25))
-	sprite.set_anchor((40,40))
-	GPUAniSprite.draw = GPUAniSprite.draw_debug
-
-	mode = 0
-	delta = 0
-	frames = 0
-	while running:
-		frames += 1
-		for event in pg.event.get():
-			if event.type == pg.QUIT:
-				running = False
-			elif event.type == pg.KEYDOWN:
-				if event.key == pg.K_ESCAPE:
-					running = False
-				elif event.key == pg.K_f:
-					window_mode = window_mode + 1 if window_mode < 3 else 1
-					if window_mode == 1:
-						window.size = WINDOW_RESOLUTION
-						window.set_windowed()
-					elif window_mode == 2:
-						window.size = SMALL_RESOLUTION
-					else:
-						window.set_fullscreen(True)
-				elif event.key == pg.K_t:
-					pass
-			elif event.type == pg.MOUSEMOTION:				
-				x, y = pg.mouse.get_rel()
-				transform.x += x
-				transform.y += y
-
-			elif event.type == pg.MOUSEBUTTONDOWN:
-				sprite.queue_animation(anim2)
-				sprite.queue_animation(anim1, -1)
-
-		tfont.draw('Testing Sprites', 10, 10)
-		group.update(delta)
-		am = (frames%90)/90
-		am = 4 * am*am*am if am < 0.5 else 1 - math.pow(-2 * am + 2, 3) / 2
-		sprite.y = 800 * am
-		#sprite.y = 600 * (( 1 - (1 - am) ** 4) ) # quarterout
-		#sprite.y = 800 * (am * am * am) # quarterin
-		#sprite.y = 800 * (1 - math.cos((am * math.pi) / 2)) #sinein
-		renderer.draw_color = (255,255,255,255)
-		renderer.draw_line((0,800), (1600,800))
-		sprite.update(delta)
-		pg.sprite.spritecollide(sprite, group, False)
-		group.draw()
-		sprite.draw()
-		renderer.present()
-		delta = clock.tick(30)
-		renderer.draw_color = (0,0,0,255)
-		renderer.clear()
-
-if __name__ == '__main__':
-	main()

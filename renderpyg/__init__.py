@@ -30,8 +30,11 @@ if pg.get_sdl_version()[0] < 2:
 print('renderpy {} running on pygame {} (SDL {}.{}.{}, python {}.{}.{})\n'.format(
         _version, pg.version.ver, *pg.get_sdl_version() + sys.version_info[0:3]))
 
-from .base import fetch_images, load_texture, load_images, scale_rect, scale_rect_ip
+from .base import (
+        fetch_images, load_texture, load_images, scale_rect, scale_rect_ip,
+        load_xml_images )
 from .sprite import keyfr, keyframes, keyrange
 from .sprite import GPUAniSprite as Sprite
-from .tilemap import load_tmx, load_tilemap_string, load_tileset, render_tilemap, Tilemap
+from .tilemap import (
+        load_tmx, load_tilemap_string, load_tileset, render_tilemap, Tilemap )
 from .tfont import TextureFont, NinePatch

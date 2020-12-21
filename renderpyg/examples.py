@@ -31,6 +31,7 @@ If not, see <http://www.gnu.org/licenses/>.
 import os, sys, random, math
 import pygame as pg
 from pygame._sdl2 import Window, Renderer, Texture, Image
+import renderpyg as pyg
 from renderpyg import Sprite, TextureFont, keyrange, load_texture
 from random import randrange
 
@@ -50,7 +51,12 @@ SPRITE_COUNT = 30
 FONT_PARAMS = dict(
 	text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
 	circle=3, rotate=15, scale=.25, colors=(75,0,0))
-EXAMPLES = ('sprites', 'tilemap', 'tfont', 'nine')
+EXAMPLES = dict(
+	sprites='animates alien sprites',
+	tilemap='scroll and zoom a garden',
+	tfont='select animated fonts from a list',
+	nine='scale nine patch images',
+	packed='animate frames from given TexturePacker xml')
 
 def sprites():
 	pg.init()
@@ -93,7 +99,7 @@ def sprites():
 	"""
 	tfont = TextureFont(renderer, FONT, FONT_SIZE)
 	sprite = Sprite(
-		(renderer, EXAMPLE_DATA+'aliens.png'), 7, 8, by_count=True)
+		(renderer, EXAMPLE_DATA+'texture.xml'), 7, 8, by_count=True)
 	group = pg.sprite.Group()
 	animations = [
 		keyrange(0, 7, 200),
@@ -108,8 +114,8 @@ def sprites():
 			randrange(0, RENDER_RESOLUTION[1]) )
 		spr.set_animation(random.choice(animations), -1)
 		spr.velocity = pg.Vector2(
-			randrange(-10, 11),
-			randrange(-10, 11))
+			randrange(-20, 20),
+			randrange(-20, 20))
 		if randrange(10) < 2:
 			spr.rotation = randrange(-10, 11)	
 		group.add(spr)
@@ -165,6 +171,7 @@ def sprites():
 		buffer.draw()
 		renderer.present() # all draw calls occur and the screen is updated here
 		delta = clock.tick(FRAMES_PER_SECOND)
+
 
 def tilemap():
 	from .tilemap import load_tilemap_string, load_tileset, render_tilemap, tile_background, Tilemap
@@ -337,6 +344,31 @@ def nine():
 		renderer.present()
 		clock.tick(30)
 
+def packed(*args):
+	from .base import load_xml_images, scale_rect
+
+	if args:
+		filename = args[0]
+	else:
+		filename = EXAMPLE_DATA+'texture.xml'
+
+	pg.init()
+	clock = pg.time.Clock()
+	window = Window("TexturePacker Test", size=SMALL_RESOLUTION)
+	renderer = Renderer(window, vsync=True)
+	clock = pg.time.Clock()
+
+	images = load_xml_images(renderer, filename)
+	dst = scale_rect(images[0].get_rect(), 2)
+	dst.center = renderer.get_viewport().center
+	for image in images:
+		image.draw(dstrect=dst)
+		renderer.present()
+		clock.tick(5)
+		renderer.clear()
+		pg.event.pump()
+
+
 map_data = """
 7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
 7,0,0,0,0,0,0,0,0,0,34,31,0,0,0,0,4,4,0,0,0,0,0,0,0,0,51,0,0,0,0,0,40,0,0,0,33,29,29,29,29,29,29,29,29,29,29,29,29,26,26,26,26,26,26,26,26,28,0,0,0,7,7,0,0,51,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14,0,0,0,50,0,0,0,0,50,0,0,0,0,0,0,0,51,0,0,0,0,0,4,0,0,0,0,6,1,1,1,1,1,1,1,1,1,1,1,7,
@@ -414,13 +446,12 @@ map_data = """
 7,0,0,0,0,0,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,0,51,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,0,33,32,51,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,51,0,30,26,26,26,26,26,26,26,28,0,0,0,0,51,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,7,
 7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,"""
 
-
 if __name__ == '__main__':
 	if len(sys.argv) > 1:
 		if sys.argv[1] in EXAMPLES:
 			locals()[sys.argv[1]](*sys.argv[2:])
 	else:
 		print('AVAILABLE EXAMPLES')
-		for name in EXAMPLES:
-			print(name)
+		for name, desc in EXAMPLES.items():
+			print('{:10s}:  {}'.format(name, desc))
 		print('\nTry python -m renderpyg.examples example_name parameters')

@@ -68,19 +68,25 @@ class TextureFont():
 		:param y: y coordinate to draw at
 		:param color: (r,g,b) color tuple
 		:param alpha: alpha transparency value
-		:param center: treat x,y coordinate as center position
+		:param center: treat x coordinate as center position
+		:rvalue rect: actual area drawn into
 		'''
 		dest = pg.Rect(x, y, 1, self.height)
 		self.texture.alpha = alpha or 255
 		self.texture.color = color if color else (255,255,255,0)
 		if center:
 			dest.left -= self.width(text) // 2
-			dest.top -= self.height // 2
+			#dest.top -= self.height // 2
+
+		x, y = dest.x, dest.top
+		width = 0
 		for c in text:
 			src = self.cmap.get(c, self.blank)
 			dest.width = src.width
 			self.texture.draw(srcrect=src, dstrect=dest)
 			dest.x += src.width
+			width += src.width
+		return pg.Rect(x, y, width, self.height)
 	
 	def animate(self, text, x, y, color=(255,255,255), center=False, duration=3000, **kwargs):
 		'''
@@ -90,6 +96,7 @@ class TextureFont():
 		:param x: x coordinate to draw at
 		:param y: y coordinate to draw at
 		:param color: base (r,g,b) color tuple to draw text
+		:param center: treat x coordinate as center position
 		:param fade: amount to fade during duration
 		:param duration: time in ms for complete animation cycle
 		:param variance: percent to vary animation cycle between each character
@@ -100,6 +107,7 @@ class TextureFont():
 		:param colors: optional (r,g,b) amount to cycle color 
 		:param move: optional x, y variance to move characters
 		:param circle: optional radius to move characters (overrides move)
+		:rvalue rect: rect area drawn into but animation may extrude the borders
 		'''
 		variance = kwargs.get('variance', 0)
 		timer = kwargs.get('timer', 0)
@@ -111,7 +119,9 @@ class TextureFont():
 		fade = kwargs.get('fade', 0)
 
 		if center:
-			x = x - (self.width(text) / 2)
+			x -= self.width(text) / 2
+			#y -= self.height / 2
+		topleft = x, y
 
 		ticks = pg.time.get_ticks()
 		variance, change = duration * (variance/100), 0
@@ -167,6 +177,7 @@ class TextureFont():
 				srcrect=src, dstrect=dest, origin=origin, angle=angle)
 			x += src.width
 			change += variance
+		return pg.Rect(topleft[0], topleft[1], x, self.height)
 
 	def width(self, text):
 		'''
@@ -212,11 +223,12 @@ class NinePatch():
 		self.area = pg.Rect(area)
 		self.left, self.top, self.right, self.bottom = borders
 
-	def draw(self, target):
+	def draw(self, target, hollow=False):
 		'''
 		Draw the ninepatch into target rect
 
 		:param target: rect area to draw nine patch into
+		:param hollow: center patch not drawn when set True
 		:rvalue None:
 		'''
 		if not isinstance(target, pg.Rect):
@@ -243,14 +255,15 @@ class NinePatch():
 			srcrect=(bounds.left, bounds.top+self.top, self.left,
 					bounds.height-self.top-self.bottom),
 			dstrect=(target.left, target.top+self.top, self.left,
-					target.height-self.top-self.bottom) )		
-		texture.draw(
-			srcrect=(bounds.left+self.left, bounds.top+self.top,
-					bounds.width-self.right-self.left,
-					bounds.height-self.top-self.bottom),
-			dstrect=(target.left+self.left, target.top+self.top,
-					target.width-self.right-self.left,
-					target.height-self.top-self.bottom) )		
+					target.height-self.top-self.bottom) )	
+		if not hollow:	
+			texture.draw(
+				srcrect=(bounds.left+self.left, bounds.top+self.top,
+						bounds.width-self.right-self.left,
+						bounds.height-self.top-self.bottom),
+				dstrect=(target.left+self.left, target.top+self.top,
+						target.width-self.right-self.left,
+						target.height-self.top-self.bottom) )		
 		texture.draw(
 			srcrect=(bounds.right-self.right, bounds.top+self.top,
 					self.right,bounds.height-self.bottom-self.top),
@@ -271,6 +284,22 @@ class NinePatch():
 					self.right, self.bottom),
 			dstrect=(target.right-self.right, target.bottom-self.bottom,
 					self.right, self.bottom) )
+
+	def surround(self, target, padding=0, hollow=False):
+		"""
+		Surround given rect with optional padding
+
+		:param target: rect or 4-tupple to surround with ninepatch
+		:param padding: int of extra space around the rect
+		:rvale rect: the full area drawn
+		"""
+		rect = pg.Rect(target)
+		rect.x -= self.left + padding
+		rect.width += self.left + self.right + padding * 2
+		rect.y -= self.top + padding
+		rect.height += self.top + self.bottom + padding * 2
+		self.draw(rect, hollow)
+		return rect
 
 
 
