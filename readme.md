@@ -81,6 +81,8 @@ for _ in range 1000:
 ## Textured Fonts
 The TextureFont class supports True Type Fonts (.ttf) that can be loaded by the pygame.font module. It loads the font into texture memory for fast drawing, with optional scaling, color shifting, and animation. It does not support kerning at this time.
 
+For best performance you should use as few textures as possible. Use TextureFont.multi_font() to load multiple fonts into the same texture.
+
 ![font example](./renderpyg/docs/text.png)
 
 ```py
@@ -590,6 +592,15 @@ Draw text string onto pygame._sdl2 GPU renderer
 - *center*:  treat x coordinate as center position
 - *rvalue*:  Rect for actual area drawn into
 
+**multi_font**(self, renderer, fonts)  
+STATIC method allows multiple fonts on a single shared texture by passing a list of (filename, size) tuples. Will raise an error if the texture height would exceed 1024.
+
+- *renderer*: pygame._sdl2.video.Renderer to draw on
+- *fonts*: list of (filename, size) tuples for each font
+    - *filename*: path to a pygame.font.Font compatible file (ttf)
+    - *size*: point size for font
+- *rvalue*: tuple of TextureFont objects for each item in fonts
+
 **width**(self, text)  
 Calculate width of given text not including motion or scaling effects
      
@@ -689,7 +700,7 @@ Draw pytmx or inbuilt tilemap onto pygame GPU renderer
 - *clamp*:  True to adjust camera to fit world coordinates
 - *rvalue*:  (camx, camy, scale) for adjusting other images
 
-## Disclaimer  
+##Disclaimer
 Copyright (C) 2020, Michael C Palmer <michaelcpalmer1980@gmail.com>
 
 This file is part of renderpyg
