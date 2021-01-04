@@ -27,7 +27,7 @@ from pygame._sdl2 import Renderer, Texture, Image
 
 loaded_textures = {}
 
-def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
+def fetch_images(texture, width=0, height=0, spacing=0, margin=0, by_count=False, rects=None):
 	"""
 	Returns an image list generated from a given texture and either the
 	image size or the number of images in a sprite sheet.
@@ -42,7 +42,7 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 	:rvalue: list of pygame._sdl2.video.Image objects
 	"""
 	tex_width, tex_height = texture.get_rect().size
-	if type(texture) == Image:
+	if isinstance(texture, Image):
 		marginx = margin + image.srcrect.x
 		marginy = margin + image.srcrect.y
 	else:
@@ -52,20 +52,25 @@ def fetch_images(texture, width, height, spacing=0, margin=0, by_count=False):
 		width = tex_width // width
 		height = tex_height // height
 
-	r = pg.Rect(0, 0, width, height)
 	tiles = []
+	if rects:
+		for rect in rects:
+			im = Image(texture, srcrect=rect)
+			tiles.append(im)
+		return tiles		
+
+	r = pg.Rect(0, 0, width, height)
 	for y in range(margin, tex_height+margin-height+1, height+spacing):
 		for x in range(margin, tex_width+margin-width+1, width+spacing):
 			r.x = x
 			r.y = y
-			im = Image(texture)
-			im.srcrect = r.copy()
+			im = Image(texture, srcrect=r)
 			tiles.append(im)
 	return tiles
 
 
 def load_xml_images(renderer, filename, _filter=[], by_name=False):
-	'''
+	"""
 	Load images from a TextureAtlas XML file. Images may be filtered
 	and are return in a list, or optionally, a dict images indexed by
 	the name found in the xml file.
@@ -76,7 +81,7 @@ def load_xml_images(renderer, filename, _filter=[], by_name=False):
 	:param by_name: set true to return a dict with image names
 	:rvalue: list of images as ordered in filename by default
 		optionally returns dict with image names instead
-	'''
+	"""
 	import xml.etree.ElementTree as ET
 	import os
 
@@ -100,8 +105,7 @@ def load_xml_images(renderer, filename, _filter=[], by_name=False):
 			rect = pg.Rect(
 				int(child.attrib['x']), int(child.attrib['y']),
 				int(child.attrib['w']), int(child.attrib['h']))
-			img = Image(texture)
-			img.srcrect = rect
+			img = Image(texture, srcrect=rect)
 			numbers.append(img)
 			names[child.attrib.get('n')] = img
 
@@ -119,13 +123,14 @@ def load_texture(renderer, filename):
 	"""
 	try:
 		surf = pg.image.load(str(filename))
-	except:
-		raise FileNotFoundError('cannot open: ', filename)
+	except Exception as e:
+		raise FileNotFoundError('[Error] {}: cannot open: {}'.format(
+			type(e).__name__, filename))
 	return Texture.from_surface(renderer, surf)
 
 
 def load_images(
-		renderer, filename, width, height, spacing=0, margin=0, by_count=False):
+		renderer, filename, width=0, height=0, spacing=0, margin=0, by_count=False, rects=None):
 	"""
 	Load a texture from given image file and generate a series of
 	images from it with the given width and height.
@@ -143,7 +148,7 @@ def load_images(
 	if filename.endswith('.xml'):
 		self.fetch_xml_images(texture, filename)
 	texture = load_texture(renderer, filename)
-	return fetch_images(texture, width, height, spacing, margin, by_count)
+	return fetch_images(texture, width, height, spacing, margin, by_count, rects=None)
 
 def scale_rect(rect, amount):
 	"""
@@ -170,7 +175,7 @@ def scale_rect_ip(rect, amount):
 	:rvalue None:
 	"""
 	c = rect.center
-	rect.width = rect.width * amount
-	rect.height = rect.height * amount
+	rect.width *= amount
+	rect.height *= amount
 	rect.center = c
 	return rect
