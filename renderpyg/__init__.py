@@ -21,20 +21,23 @@ License along with renderpyg.
 If not, see <http://www.gnu.org/licenses/>.
 '''
 import os, sys
+hide = os.environ.get('PYGAME_HIDE_SUPPORT_PROMPT', False)
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1"
 import pygame as pg
 
 _version = '0.0.1'
 if pg.get_sdl_version()[0] < 2:
     raise SystemExit("This example requires pygame 2 and SDL2.")
-print('renderpy {} running on pygame {} (SDL {}.{}.{}, python {}.{}.{})\n'.format(
-        _version, pg.version.ver, *pg.get_sdl_version() + sys.version_info[0:3]))
+if not hide:
+    print('renderpy {} running on pygame {} (SDL {}.{}.{}, python {}.{}.{})\n'.format(
+            _version, pg.version.ver, *pg.get_sdl_version() + sys.version_info[0:3]))
 
 from .base import (
         fetch_images, load_texture, load_images, scale_rect, scale_rect_ip,
-        load_xml_images )
+        load_xml_images, sr )
 from .sprite import keyfr, keyframes, keyrange
 from .sprite import GPUAniSprite as Sprite
 from .tilemap import (
         load_tmx, load_tilemap_string, load_tileset, render_tilemap, Tilemap )
-from .tfont import TextureFont, NinePatch
+from .tfont import TextureFont, NinePatch, round_patch
+from .menu import Menu

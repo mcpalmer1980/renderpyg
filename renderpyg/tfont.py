@@ -24,10 +24,11 @@ If not, see <http://www.gnu.org/licenses/>.
 '''
 import os, sys, random, math
 import pygame as pg
+import pygame.gfxdraw
 from pygame._sdl2 import Window, Renderer, Texture, Image
 from .base import load_texture
 
-char_map = ''' ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,?!-:'"=+<>~@/\\|()'''
+char_map = ''' _ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,?!-:'"=+<>~@/\\|(%)'''
 class TextureFont():
 	'''
 	Font renderer for use with pygame._sdl2
@@ -144,7 +145,7 @@ class TextureFont():
 		return tfonts
 
 
-	def draw(self, text, x, y, color=None, alpha=None, center=False, centery=False):
+	def draw(self, text, x, y, color=None, alpha=None, align=False, valign=False):
 		'''
 		Draw text string onto pygame._sdl2 GPU renderer
 
@@ -153,15 +154,20 @@ class TextureFont():
 		:param y: y coordinate to draw at
 		:param color: (r,g,b) color tuple
 		:param alpha: alpha transparency value
-		:param center: treat x coordinate as center position
+		:param align: treat x as 'center' or 'right' pos (def left)
+		:param valign: treat y as 'center' or 'bottom' pos (def top)
 		:rvalue rect: actual area drawn into
 		'''
 		dest = pg.Rect(x, y, 1, self.height)
 		self.texture.alpha = alpha or 255
 		self.texture.color = color if color else (255,255,255,0)
-		if center:
+		if align == 'right':
+			dest.left -= self.width(text)
+		elif align == 'center':
 			dest.left -= self.width(text) // 2
-		if centery:
+		if valign == 'bottom':
+			dest.top -= self.height
+		elif valign == 'center':
 			dest.top -= self.height // 2
 
 		x, y = dest.x, dest.top
@@ -174,7 +180,7 @@ class TextureFont():
 			width += src.width
 		return pg.Rect(x, y, width, self.height)
 
-	def scale(self, text, x, y, scale, color=None, alpha=None, center=False, centery=False):
+	def scale(self, text, x, y, scale, color=None, alpha=None, align=False, valign=False):
 		'''
 		Draw scaled text string onto pygame._sdl2 GPU renderer
 
@@ -183,18 +189,23 @@ class TextureFont():
 		:param y: y coordinate to draw at
 		:param color: (r,g,b) color tuple
 		:param alpha: alpha transparency value
-		:param center: treat x coordinate as center position
+		:param align: treat x as 'center' or 'right' pos (def left)
+		:param valign: treat y as 'center' or 'bottom' pos (def top)
 		:rvalue rect: actual area drawn into
 		'''
 
+		dest = pg.Rect(x, y, 1, self.height*scale)
 		self.texture.alpha = alpha or 255
 		self.texture.color = color if color else (255,255,255)
-		if center:
-			x -= self.width(text)*scale // 2
-		if centery:
-			y -= self.height*scale // 2
+		if align == 'right':
+			dest.left -= self.width(text, scale)
+		elif align == 'center':
+			dest.left -= self.width(text, scale) // 2
+		if valign == 'bottom':
+			dest.top -= self.height * scale
+		elif valign == 'center':
+			dest.top -= self.height * scale // 2
 
-		dest = pg.Rect(x, y, 1, self.height*scale)
 		#x, y = dest.x, dest.top
 
 		width = 0
@@ -202,6 +213,7 @@ class TextureFont():
 			src = self.cmap.get(c, self.blank)
 			dest.width = src.width*scale
 			self.texture.draw(srcrect=src, dstrect=dest)
+			#self.texture.renderer.draw_rect(dest)
 			dest.x += src.width*scale
 			width += src.width*scale
 		self.get_rect(text, x, y, scale, center=False)
@@ -232,7 +244,7 @@ class TextureFont():
 		return pg.Rect(x, y, width, self.height*scale)
 
 	def animate(
-			self, text, x, y, color=(255,255,255), center=False, centery=False,
+			self, text, x, y, color=(255,255,255), align=False, valign=False,
 			duration=3000, scale=1, **kwargs):
 		'''
 		Draw animated text onto pygame._sdl2 GPU renderer
@@ -241,7 +253,8 @@ class TextureFont():
 		:param x: x coordinate to draw at
 		:param y: y coordinate to draw at
 		:param color: base (r,g,b) color tuple to draw text
-		:param center: treat x coordinate as center position
+		:param align: treat x as 'center' or 'right' pos (def left)
+		:param valign: treat y as 'center' or 'bottom' pos (def top)
 		:param fade: amount to fade during duration
 		:param duration: time in ms for complete animation cycle
 		:param variance: percent to vary animation cycle between each character
@@ -263,10 +276,15 @@ class TextureFont():
 		circle = kwargs.get('circle', False)
 		fade = kwargs.get('fade', 0)
 
-		if center:
-			x -= self.width(text)*scale / 2
-		if centery:
-			y -= self.height*scale / 2
+		if align == 'right':
+			x -= self.width(text, scale)
+		elif align == 'center':
+			x -= self.width(text, scale) // 2
+		if valign == 'bottom':
+			y -= self.height * scale
+		elif valign == 'center':
+			y -= self.height * scale // 2
+
 		topleft = x, y
 
 		ticks = pg.time.get_ticks()
@@ -361,6 +379,7 @@ class NinePatch():
 		'''
 		if isinstance(source, Texture):
 			self.texture = source
+			area = area or source.get_rect()
 		elif type(source) == Image:
 			self.texture = source.texture
 			area = area or source.srcrect
@@ -394,56 +413,56 @@ class NinePatch():
 		if color:
 			texture.color, color = color, texture.color
 
-		texture.draw(
+		texture.draw( # TOP
 			srcrect=(bounds.left, bounds.top, self.left, self.top),
 			dstrect=(target.left, target.top, self.left, self.top) )	
-		texture.draw(
+		texture.draw( # LEFT
 			srcrect=(bounds.left, bounds.top+self.top, self.left,
 					bounds.height-self.top-self.bottom),
 			dstrect=(target.left, target.top+self.top, self.left,
 					target.height-self.top-self.bottom) )
-		texture.draw(
+		texture.draw( # BOTTOM-LEFT
 			srcrect=(bounds.left, bounds.bottom-self.bottom,
 					self.left, self.bottom),
 			dstrect=(target.left, target.bottom-self.bottom,
 					self.left, self.bottom) )	
 
-		texture.draw(
+		texture.draw( # TOP-RIGHT
 			srcrect=(bounds.right-self.right, bounds.top,
 					self.right, self.top),
 			dstrect=(target.right-self.right, target.top,
-					self.right, self.top) )				
-		texture.draw(
+					self.right, self.top) )		
+		texture.draw( # RIGHT
 			srcrect=(bounds.right-self.right, bounds.top+self.top,
 					self.right,bounds.height-self.bottom-self.top),
 			dstrect=(target.right-self.right, target.top+self.top,
 					self.right, target.height-self.bottom-self.top) )
-		texture.draw(
+		texture.draw( # BOTTOM-RIGHT
 			srcrect=(bounds.right-self.right, bounds.bottom-self.bottom,
 					self.right, self.bottom),
 			dstrect=(target.right-self.right, target.bottom-self.bottom,
-					self.right, self.bottom) )
-
-		texture.draw(
+					self.right, self.bottom) ) 
+		'''
+		texture.draw( # CENTER
 			srcrect=(bounds.left+self.left, bounds.top+self.top,
 					bounds.width-self.right-self.left,
 					bounds.height-self.top-self.bottom),
 			dstrect=(target.left+self.left, target.top+self.top,
 					target.width-self.right-self.left,
-					target.height-self.top-self.bottom) )		
-		texture.draw(
+					target.height-self.top-self.bottom) )	'''
+		texture.draw( # TOP
 			srcrect=(bounds.left+self.left, bounds.top,
 					bounds.width-self.left-self.right, self.top),
 			dstrect=(target.left+self.left, target.top,
 					target.width-self.left-self.right, self.top) )
-		texture.draw(
+		texture.draw( # CENTER
 			srcrect=(bounds.left+self.left, bounds.top+self.top,
 					bounds.width-self.right-self.left,
 					bounds.height-self.top-self.bottom),
 			dstrect=(target.left+self.left, target.top+self.top,
 					target.width-self.right-self.left,
-					target.height-self.top-self.bottom) )		
-		texture.draw(
+					target.height-self.top-self.bottom) )
+		texture.draw( # BOTTOM
 			srcrect=(bounds.left+self.left, bounds.bottom-self.bottom,
 					bounds.width-self.left-self.right, self.bottom),
 			dstrect=(target.left+self.left, target.bottom-self.bottom,
@@ -534,7 +553,7 @@ class NinePatch():
 		return target
 
 
-	def surround(self, target, padding=0, pady=0, hollow=False):
+	def surround(self, target, padding=0, pady=0, hollow=False, draw=True):
 		"""
 		Surround given rect with optional padding
 
@@ -551,7 +570,87 @@ class NinePatch():
 		rect.width += self.left + self.right + padx * 2
 		rect.y -= self.top + pady
 		rect.height += self.top + self.bottom + pady * 2
-		self.draw(rect, hollow)
+		if draw:
+			self.draw(rect, hollow)
 		return rect
+
+def round_patch2(renderer, radius, color, sizes, colors):
+	layers = list(zip(sizes, colors))
+	full_radius = radius + sum(sizes[:len(layers)])
+	surf = pg.Surface((full_radius*3, full_radius*3), pg.SRCALPHA)
+	c_rad = full_radius
+	
+	r = pg.Rect(0,0,full_radius*3, full_radius*3)
+	for size, _color in layers:
+		print(c_rad)
+		round_rect(surf, _color, r, radius)
+		r.inflate_ip(-size, -size)
+		c_rad -= size
+	print(c_rad)
+	round_rect(surf, color, r, radius)
+	
+	return NinePatch(Texture.from_surface(renderer, surf), (full_radius,)*4)
+
+def round_patch(renderer, radius, color, sizes, colors):
+	'''
+	Generate a NinePatch object using a set of rounded rectangles of various
+	thickness allowing multiple outlines of different colors.
+
+	:param renderer: pygame._sdl2.video.Renderer to draw on
+	:param radius: radius of circular edges of the rounded rectangles
+	:param color: 3-tuple or color object for the central area
+	:param sizes: list of int sizes of outline layers starting from the outside
+	:param colors: list of 3-tuples or color objects for each outline layer
+		starting from the outside
+	'''
+	layers = list(zip(sizes, colors))
+	full_radius = radius + sum(sizes[:len(layers)])
+	surf = pg.Surface((full_radius*3, full_radius*3), pg.SRCALPHA)
+	c_rad = full_radius
+	
+	r = pg.Rect(0,0,full_radius*3, full_radius*3)
+	for size, _color in layers:
+		print(c_rad)
+		pg.draw.rect(surf, _color, r,
+			border_radius=radius)
+		r.inflate_ip(-size, -size)
+		c_rad -= size
+	print(c_rad)
+	pg.draw.rect(surf, color, r,
+		border_radius=radius)
+	
+	return NinePatch(Texture.from_surface(renderer, surf), (full_radius,)*4)
+
+
+def round_rect(surf, color, rect, rad, thick=0):
+	trans = (255,255,1)
+	if not rad:
+		pg.draw.rect(surf, color, rect, thick)
+		return
+	elif rad > rect.width / 2 or rad > rect.height / 2:
+		rad = min(rect.width/2, rect.height/2)
+
+	if thick > 0:
+		r = rect.copy()
+		x, r.x = r.x, 0
+		y, r.y = r.y, 0
+		buf = pg.surface.Surface((rect.width, rect.height)).convert()
+		buf.set_colorkey(trans)
+		buf.fill(trans)
+		round_rect(buf, r, rad, color, 0)
+		r = r.inflate(-thick*2, -thick*2)
+		round_rect(buf, r, rad, trans, 0)
+		surf.blit(buf, (x,y))
+
+
+	else:
+		r  = rect.inflate(-rad * 2, -rad * 2)
+		for corn in (r.topleft, r.topright, r.bottomleft, r.bottomright):
+			pg.draw.circle(surf, color, corn, rad)
+			#pg.gfxdraw.filled_circle(surf, *corn, rad, color)
+			#pg.gfxdraw.aacircle(surf, *corn, rad, color)
+
+		pg.draw.rect(surf, color, r.inflate(rad*2, 0))
+		pg.draw.rect(surf, color, r.inflate(0, rad*2))
 
 

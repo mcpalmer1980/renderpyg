@@ -31,144 +31,14 @@ from .base import fetch_images, load_images, load_texture
 import math
 
 buffer = None
-printfo = 'hello'
 
 try:
 	import pytmx
 	_PYTMX = True
-except:
+except ImportError:
 	_PYTMX = False
 
 def scale_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
-	'''
-	WIP smooth scaling tilemap renderer
-	Still haven't gotten this working properly
-	'''
-	return
-	global buffer
-	global printfo
-	renderer = tilemap.images[1].texture.renderer
-	old_viewport = renderer.get_viewport()
-	old_target = renderer.target
-	rend_width, rend_height = renderer.target.get_rect().size if \
-			renderer.target else old_viewport.size
-
-	if not buffer:
-		renderer.set_viewport(None)
-		size = renderer.get_viewport().size
-		buffer = Texture(renderer, size, target=True)
-		buffer.blend_mode = 1
-	renderer.target = buffer
-	renderer.clear()
-
-	rendered_rect = renderer.get_viewport()
-	if scale > 1:
-		wanted_rect = scale_rect(rendered_rect, 1/scale)
-		src_rect = wanted_rect
-		scale = 1
-	elif scale < 1:
-		pass
-
-
-	elif scale < 1:
-		actual_scale = max(scale, .5)
-		scale = 0.5
-		rect_scale = scale/actual_scale
-		wanted_rect = scale_rect(rendered_rect, rect_scale)
-		src_rect = wanted_rect
-		printfo = (f'actual={actual_scale}, set={scale}, rect={rect_scale}, '
-				'rect={src_rect}')
-
-	elif False:
-		tiles_wide = math.ceil(rend_width / (scale*tilemap.tilewidth))
-		adjusted_scale = (rend_width/tilemap.tilewidth) / tiles_wide
-		buffer_scale = 1 - (scale-adjusted_scale)
-		printfo = (f'base= {rend_width/tilemap.tilewidth}, tiles wide='
-				'{tiles_wide}, new_scale={buffer_scale}')
-		wanted_rect = scale_rect(rendered_rect, buffer_scale)
-		src_rect = wanted_rect
-		src_rect.center = rendered_rect.center
-		scale = adjusted_scale
-	else:
-		src_rect = rendered_rect
-	
-
-	if True: # center
-		cam_x = (camera.x*scale) - (rend_width / 2)
-		cam_y =  (camera.y*scale) - (rend_height / 2)
-	else:
-		cam_x = camera.x*scale
-		cam_y = camera.y*scale
-
-	cell_count = len(tilemap.images)
-	tile_w = int(tilemap.tilewidth * scale)
-	tile_h = int(tilemap.tileheight * scale)
-	cells_wide = rend_width // tile_w + 2
-	cells_high = rend_height // tile_h + 2
-
-	start_cellx, offset_x = divmod(int(cam_x), tile_w)
-	start_celly, offset_y = divmod(int(cam_y), tile_h)
-	offset_x = 0
-	offset_y = 0
-
-	percent = offset_x / tile_w
-	
-	if start_cellx < 0: # Handle negative values
-		offset_x += start_cellx * tile_w
-		start_cellx = 0
-	if start_celly < 0:
-		offset_y += start_celly * tile_h
-		start_celly = 0
-
-	dest_rect = pg.Rect(0, 0, tile_w, tile_h) 
-	layer = tilemap.layers[0].data
-
-	'''
-	Render Tilemap
-	'''
-	for row in layer[start_celly: start_celly + cells_high]:
-		for frame in row[start_cellx: start_cellx + cells_wide]:
-			if frame > 0:
-				tilemap.images[frame].draw(dstrect=dest_rect)
-			dest_rect.x += tile_w
-		dest_rect.y += tile_h
-		dest_rect.x = 0
-
-	renderer.target = old_target
-	buffer.draw(srcrect=src_rect)
-
-	'''
-	Cleanup
-	'''
-	return cam_x, cam_y, scale
-
-def tile_background(renderer, background, camera, scale=1):
-	'''
-	background: image or texture to be tiled across the screen
-	camera: Vector2 representing the top left corner of the screen
-	screensize: Rect representing the size of the buffer we will render to
-
-	This function fills the background by tiling a background image across the screen
-	It works similarly to RenderTilemap, except each 'cell' is the same larger background image
-	'''
-	rend_width, rend_height = renderer.target.get_rect().size if\
-			renderer.target else renderer.get_viewport().size
-	brect = background.get_rect()
-	brect.w *= scale
-	brect.h *= scale
-
-	px = int(camera[0])
-	py = int(camera[1])
-	ox = -int(px % brect.width)
-	oy = -int(py % brect.height)
-
-	for y in range(oy, rend_height, brect.height):
-	 	for x in range(ox, rend_width, brect.width):
-	 	 	brect.x = x
-	 	 	brect.y = y
-	 	 	background.draw(dstrect=brect)   
-
-def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 	'''
 	Draw pytmx or inbuilt tilemap onto pygame GPU renderer
 
@@ -205,8 +75,9 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 	'''
 	smooth = kwargs.get('smooth', False)
 	clamp = kwargs.get('clamp', False)
-	cam_x = int(camera.x)
-	cam_y = int(camera.y)
+	cam_x = int(camera[0])
+	cam_y = int(camera[1])
+	scale = camera[2]
 
 	dstrect = kwargs.get('dstrect', None)
 	try:
@@ -216,11 +87,122 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 			renderer.set_viewport(dstrect)
 			rend_width = dstrect.width
 			rend_height = dstrect.height
-	except:
+	except Exception:
 		raise ValueError(
 			'render_tilemap() cannot parse "{}" as dest_rect'.format(dstrect))
 
-	srcrect = kwargs.get('srcrect', None)
+	tile_w = tilemap.tilewidth * scale
+	tile_h = tilemap.tileheight * scale
+	cell_count = len(tilemap.images)
+	cells_wide = rend_width // tile_w + 2
+	cells_high = rend_height // tile_h + 2
+
+	start_cellx, offset_x = divmod(int(cam_x), tile_w)
+	start_celly, offset_y = divmod(int(cam_y), tile_h)	
+
+	layer = tilemap.layers[0].data
+
+	if 'background' in kwargs:
+		tile_background(renderer, kwargs['background'], (cam_x, cam_y), scale)
+	'''
+	Render Tilemap
+	'''
+
+	width = rend_width * scale
+	height = rend_height * scale
+
+
+	for row in layer[start_celly: start_celly + cells_high]:
+		for frame in row[start_cellx: start_cellx + cells_wide]:
+			if frame > 0:
+				tilemap.images[frame].draw(dstrect=dest_rect)
+			dest_rect.x += tile_w
+		dest_rect.y += tile_h
+		dest_rect.x = -offset_x
+
+
+	return cam_x, cam_y, scale
+
+def tile_background(renderer, background, camera=(0,0), scale=1):
+	'''
+	background: image or texture to be tiled across the screen
+	camera: Vector2 representing the top left corner of the screen
+	screensize: Rect representing the size of the buffer we will render to
+
+	This function fills the background by tiling a background image across the screen
+	It works similarly to RenderTilemap, except each 'cell' is the same larger background image
+	'''
+	rend_width, rend_height = renderer.target.get_rect().size if\
+			renderer.target else renderer.get_viewport().size
+	brect = background.get_rect()
+	brect.w *= scale
+	brect.h *= scale
+
+	px = int(camera[0])
+	py = int(camera[1])
+	ox = -int(px % brect.width)
+	oy = -int(py % brect.height)
+
+	for y in range(oy, rend_height, brect.height):
+	 	for x in range(ox, rend_width, brect.width):
+	 	 	brect.x = x
+	 	 	brect.y = y
+	 	 	background.draw(dstrect=brect)   
+
+def render_tilemap(tilemap, camera=(0,0,1), scale=1, **kwargs):
+	'''
+	Draw pytmx or inbuilt tilemap onto pygame GPU renderer
+
+	:param tilemap: pytmx or internal tilemap class
+	:param camera: pg.Vector2 for top left camera location
+	:param scale: float scale value defaults to 1.0
+	:param center: pg.Vector2 to set center camera location
+			True to adjust camera for center
+			Overides camera
+	:param srcrect: area to render in world coordinates overides scale
+			Ignores height to maintain aspect ratio
+	:param dstrect: screen area to render into
+			defaults to entire renderer area
+	:param smooth: for smoother scaling transition but less accurate
+	:param clamp: True to adjust camera to fit world coordinates
+	:rvalue (camx, camy, scale): for adjusting other images
+
+	TODO:
+		impliment smoothing
+	'''
+
+	'''
+	Setup renderer and viewport
+	'''
+	global buffer
+	renderer = tilemap.images[1].texture.renderer
+	old_viewport = renderer.get_viewport()
+	old_target = renderer.target
+	rend_width, rend_height = renderer.target.get_rect().size if\
+			renderer.target else old_viewport.size
+
+	'''
+	Parse options
+	'''
+	smooth = kwargs.get('smooth', False)
+	clamp = kwargs.get('clamp', False)
+	cam_x = int(camera[0])
+	cam_y = int(camera[1])
+	scale = camera[2]
+
+	dstrect = kwargs.get('dstrect', None)
+	try:
+		if dstrect:
+			if not hasattr(dstrect, 'width'):
+				dstrect = pg.Rect(*dstrect)
+			renderer.set_viewport(dstrect)
+			rend_width = dstrect.width
+			rend_height = dstrect.height
+	except Exception:
+		raise ValueError(
+			'render_tilemap() cannot parse "{}" as dest_rect'.format(dstrect))
+
+	srcrect = kwargs.get('srcrect')
 	try:
 		if hasattr(srcrect, 'width'):
 			renderer.set_viewport(srcrect)
@@ -289,9 +271,13 @@ def render_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 		dest_rect.y += tile_h
 		dest_rect.x = -offset_x
 
+	#camera[0] = cam_x
+	#camera[1] = cam_y
+
 	'''
 	Cleanup
 	'''
+	#camera = cam_x, cam_y, scale
 	return cam_x, cam_y, scale
 	
 
@@ -501,7 +487,7 @@ class Tilemap:
 		else:
 			try:
 				tiles = len(replacement)
-			except:
+			except Exception as e:
 				raise ValueError(
 					'Tilemap.update_texture cannot parse "{}" '+
 					'as texture or tileset'.format(replacement))	
@@ -538,7 +524,7 @@ class Tilemap:
 			else:
 				print('tilemap not valid with current tileset')
 				return False
-		except:
+		except Exception as e:
 			raise ValueError('Tilemap.update_tilemap cannot parse '+
 					'"{}" as tilemap'.format(_map))
 

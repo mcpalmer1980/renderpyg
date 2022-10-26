@@ -45,8 +45,8 @@ WINDOW_RESOLUTION = (1600, 900)
 SMALL_RESOLUTION = (800, 450)
 FRAMES_PER_SECOND = 30
 FONT = EXAMPLE_DATA+'font.ttf' 
-FONT_SIZE = 72
-SPRITE_COUNT = 30
+FONT_SIZE = 64
+SPRITE_COUNT = 64
 FONT_PARAMS = dict(
 	text='Dancing Font', x=10, y=10, color=(175,0,0), variance=30,
 	circle=3, rotate=15, scale=.25, colors=(75,0,0))
@@ -112,12 +112,13 @@ def sprites():
 			randrange(0, RENDER_RESOLUTION[0]),
 			randrange(0, RENDER_RESOLUTION[1]) )
 		spr.set_animation(random.choice(animations), -1)
-		spr.velocity = pg.Vector2(
-			randrange(-20, 20),
-			randrange(-20, 20))
+		#spr.velocity = pg.Vector2(
+		#	randrange(-20, 20),
+		#	randrange(-20, 20))
+		spr.scaling = 1.001
 		
-		if randrange(10) < 2:
-			spr.rotation = randrange(-10, 11)	
+		#if randrange(10) < 2:
+		#	spr.rotation = randrange(-10, 11)	
 		group.add(spr)
 	""" 
 	Here starts a simple game loop
@@ -174,7 +175,7 @@ def sprites():
 
 
 def tilemap():
-	from .tilemap import load_tilemap_string, load_tileset, render_tilemap, tile_background, Tilemap
+	from .tilemap import load_tilemap_string, load_tileset, render_tilemap, tile_background, Tilemap, scale_tilemap
 	pg.init()
 	window = Window('Testing', (1600,900))
 	renderer = Renderer(window)
@@ -191,8 +192,8 @@ def tilemap():
 	loaded_map = load_tilemap_string(map_data)
 	loaded_cells = load_tileset(renderer, EXAMPLE_DATA+'tiles.png', 64,64)
 	tilemap = Tilemap(loaded_map, loaded_cells)
-	tilemap.update_tilemap(loaded_map, 0)
-	tilemap.add_layer(loaded_map)
+	#tilemap.update_tilemap(loaded_map, 0)
+	#tilemap.add_layer(loaded_map)
 	background = load_texture(renderer, EXAMPLE_DATA+'grass.png')
 	camera = pg.Vector3(800,450,1)
 	scale = 1
@@ -240,9 +241,9 @@ def tilemap():
 					scale -= 0.01
 
 		camera[2] = scale
-		render_tilemap(tilemap, camera, scale, center=True, clamp=True, background=background)
-		group.update(delta)
-		group.draw()
+		scale_tilemap(tilemap, camera, scale, center=False, clamp=True, background=background)
+		#group.update(delta)
+		#group.draw()
 		tfont.draw('Click and drag to scroll, wheel to zoom', 10, 10)
 		tfont.draw('Camera {} Scale: {:.1f}%'.format(camera, scale*100), 10, 60)
 		renderer.present()
@@ -300,9 +301,9 @@ def tfont():
 		for i, item in enumerate(example_list):
 			if i==selected:
 				tfont.animate(
-					item, x, y, center=True, **examples[item])
+					item, x, y, align='center', **examples[item])
 			else:
-				tfont.animate(item, x, y, center=True, **default)
+				tfont.animate(item, x, y, align='center', **default)
 			y += tfont.height * 1.2
 
 		renderer.present()
@@ -440,6 +441,7 @@ def menu():
 		position = 6,
 		text_scale=.6,
 	)
+	menu_basic = Menu(renderer, font)
 
 	menu_classic = Menu(
 		renderer, font, clock=clock,
@@ -468,13 +470,14 @@ def menu():
 		text_font=tfont, text_scale	=.4,
 		title_font=tfont, title_scale=1.25, title_color=(0,0,200)
 	)
-	menu = menu_spinner
+	menu = menu_basic
 	menu.title_anim = anim_light
 
 	options = dict(
 		type=('blank', 'oldschool', 'spinner', 'full', ('menu: ','')),
-		back=('off', 'on', ('back: ','')),
-		lab1='text',
+		back=('off', 'on', ('back: \t','')),
+		lab1=('left\tright'),
+		test={'type': 'SPACER', 'amount': '2'},
 		color=('white', 'red', 'blue'),
 		anim=('none', 'some', 'lots', ('anim: ', '')),
 		anim_speed={'type': 'SLIDER', 'label': 'speed', 'min': 1, 'max': 9, 'step': 1} )
@@ -531,7 +534,7 @@ def menu():
 			text, i, button = menu.input('New Title', ('Okay', 'Cancel'))
 			title = text if button == 'Okay' else title
 		elif result == 'options':
-			clicked, new = menu.options(options, title, buttons=('Okay', 'Cancel'))
+			_, clicked, new = menu.options(options, title)#, buttons=('Okay', 'Cancel'))
 			if clicked == 'Okay' or True:
 				options = new
 				menu = set_options()
@@ -627,6 +630,7 @@ map_data = """
 7,0,0,0,0,0,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,51,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,33,26,26,32,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,51,0,0,0,0,0,0,0,0,0,0,0,30,26,26,26,26,26,26,26,28,0,0,0,0,0,0,0,0,38,39,39,39,39,39,32,0,40,0,0,51,7,
 7,0,0,0,0,0,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,0,51,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,0,33,32,51,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,51,0,30,26,26,26,26,26,26,26,28,0,0,0,0,51,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,7,
 7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,"""
+
 
 if __name__ == '__main__':
 	if len(sys.argv) > 1:

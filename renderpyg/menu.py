@@ -25,12 +25,13 @@ If not, see <http://www.gnu.org/licenses/>.
 '''
 import os, pygame as pg
 from pygame._sdl2.video import Window, Renderer, Texture, Image
-from .tfont import NinePatch, TextureFont
+from .tfont import NinePatch, TextureFont, char_map
 from .base import load_texture, scale_rect, fetch_images
 from .tilemap import tile_background
 from collections import OrderedDict
 
 class Menu:
+	buffer = None
 	"""
 	Simple menuing system for use with pygame2 GPU renderer
 	"""
@@ -49,8 +50,13 @@ class Menu:
 		:param joystick: (joystick, but_select, but_cancel)
 		:param label: (r,g,b) color for label font used in option menu
 		:param patch: NinePatch object to wrap around menu defaults blank
+		:param title_offset: offset to draw title in upper area of patch
+		:param frame: draw solid frame in lue of patch, using
+			(outline color, fill color, outline thickness)
+
 		:param position: position of menu defaults to center  
 			uses numbers 1-9, with 1 at top-left corner and 9 at bottom right
+			set to 'mouse' to center around mouse position
 		:param scale: scaling multiplier for default font
 		:param spacing: vertical spacing between menu items
 
@@ -64,9 +70,9 @@ class Menu:
 			item in select menus
 
 		:param opt_left: image for left arrow in option list menus  
-        also used for page icons in multipage select menus
+			also used for page icons in multipage select menus
 		:param opt_right: image for right arrow in option list menus  
-        also used for page icons in multipage select menus
+			also used for page icons in multipage select menus
 
 		:param press_color: color modifier for patch of selected button
 		:param press_patch: NinePatch for selected button
@@ -97,6 +103,11 @@ class Menu:
 		:param title_color: color of title text
 		:param title_font: optional font for title
 		:param title_scale: scaling multiplier for title text
+
+		Create a menu object that can create lists, dialogs, text inputs
+		and option menus. 
+
+		Add a tab to the begining of an option string to align left or right
 		"""
 		self.target = target
 		self.font = font
@@ -106,10 +117,12 @@ class Menu:
 		self.color = kwargs.get('color', (255,255,255))
 		self.joystick = kwargs.get('joystick', None)
 		self.label = kwargs.get('label', self.color)
-		self.patch = kwargs.get('patch')
-		self.position = kwargs.get('positions', 5)
+		self.patch = kwargs.get('patch', None)
+		self.position = kwargs.get('position', 5)
 		self.reg_scale = kwargs.get('scale', 1)
 		self.spacing = kwargs.get('spacing', 0)
+		self.spacingx = kwargs.get('spacing_x', self.spacing)
+		self.frame = kwargs.get('frame', None)
 
 		self.box = kwargs.get('box', ((255,255,255), (0,0,0),  8))
 		self.box_fill = kwargs.get('box_fill', self.box)
@@ -125,7 +138,7 @@ class Menu:
 		self.press_patch = kwargs.get('press_patch')
 
 		self.sel_anim = kwargs.get('sel_anim', self.anim)
-		self.sel_color = kwargs.get('sel_color', self.color)
+		self.sel_color = kwargs.get('sel_color', (255,255,0))
 		left = kwargs.get('sel_left', 0)
 		right = kwargs.get('sel_right', 0)
 		self.sel_patch = kwargs.get('sel_patch')
@@ -140,9 +153,17 @@ class Menu:
 		self.text_anim = kwargs.get('text_anim')
 
 		self.title_anim = kwargs.get('title_anim')
-		self.title_scale = kwargs.get('title_scale', 1)
+		self.title_scale = kwargs.get('title_scale', 1.25)
 		self.title_color = kwargs.get('title_color', self.color)
 		self.title_font = kwargs.get('title_font', self.font)
+		self.title_offset = kwargs.get('title_offset', 0)
+		self.alpha = kwargs.get('alpha', 255)
+
+		buffer = kwargs.get('buffer', None)
+		if buffer:
+			Menu.buffer = buffer
+		elif not Menu.buffer:
+			Menu.buffer = Texture(target, target.get_viewport().size, target=True)
 		
 		if hasattr(left, 'get_rect'):
 			self.left = left
@@ -157,8 +178,15 @@ class Menu:
 			self.r_space = right
 			self.right = None
 
+		if self.frame:
+			outline = self.frame[2] * 2
+			self.r_space += outline
+			self.l_space += outline
+
 		self.area = pg.Rect(0,0,1,1)
 		self.viewport = target.get_viewport()
+		self.window = kwargs.get('window', self.viewport)
+
 		self.editing = False
 		self.selected = self.bselected = 0
 		self.joy_pressed = False
@@ -166,6 +194,12 @@ class Menu:
 		self.but_rects = []
 		self.set_background(background)
 
+	def _draw_frame(self):
+		color, outline, thick = self.frame
+		self.target.draw_color = outline + (100,)
+		self.target.fill_rect(self.area.inflate(thick*2, thick*2))
+		self.target.draw_color = 100,0,0,100
+		self.target.fill_rect(self.area)
 
 	def _break_text_lines(self, text, width, max_height):
 		final_lines = []
@@ -179,15 +213,21 @@ class Menu:
 		for requested_line in requested_lines:
 			if font.width(requested_line, scale) > width:
 				words = requested_line.split(' ')
-				for word in words:
-					if font.width(word, scale) >= width:
-						raise Exception	(
-							"The word " + word + 
-							" is too long to fit in the rect passed.")
+				#for word in words:
+					#if font.width(word, scale) >= width:
+					#	raise Exception	(
+					#		"The word " + word + 
+					#		" is too long to fit in the rect passed.")
 
 				# Start a new line
 				accumulated_line = ""
 				for word in words:
+					if font.width(word, scale) >= width:
+						for i, _ in enumerate(word):
+							if font.width('...'+word[i:], scale) < width:
+								word = '...' + word[i:]
+								break
+
 					test_line = accumulated_line + word + " "
 					# Build the line while the words fit.
 					if font.width(test_line, scale) < width:
@@ -228,6 +268,7 @@ class Menu:
 			options = option.get('options', ('',))
 			option['selected'] = int(sel % len(options))
 			option['value'] = option['options'][option['selected']]
+			return option['value']
 		elif option.get('type') == 'SLIDER':
 			if pg.mouse.get_pressed()[0] and r.collidepoint(pos):
 				x = pos[0] - r.left
@@ -237,9 +278,12 @@ class Menu:
 				v = option['value'] + option['step'] * direct
 			high, low = option['max'], option['min']
 			option['value'] = round(min(max(round(v), low), high))
+			return option['value']
 
 	def _draw_box(self, x, y):
-		rect = pg.Rect(x, y, self.area.width, self.font.height*self.reg_scale)
+		rect = pg.Rect(x+self.spacingx, y,
+				self.area.width-self.spacingx*2 -self.spacingx,
+				self.font.height*self.reg_scale)
 		if isinstance(self.box, NinePatch):
 			rect.height += self.but_padding[1]
 			self.box.draw(rect)
@@ -272,14 +316,14 @@ class Menu:
 			r.height = max(r.height, self.but_patch.min_height)
 
 		if which == 0:
-			r.right = self.area.right
+			r.right = self.area.right - self.spacingx
 		elif which == 1:
-			r.left = self.area.left
+			r.left = self.area.left + self.spacingx
 		elif which == 2:
 			r.centerx = self.area.centerx
 
 		if len(self.rects) > 0 and self.selected != len(self.rects) :
-			which = -1
+			which = -1 # hide selection when button row not selected
 
 		text_color = self.sel_color if self.bselected == which else self.color
 		press_color = self.press_color if self.bselected == which else None
@@ -287,27 +331,31 @@ class Menu:
 
 		r.bottom = self.area.bottom
 		if self.but_patch:
-			self.but_patch.draw(r, False, press_color)
+			self.but_patch.draw(r, False, press_color) #press_color)
 
 		if anim:
 			self.font.animate(
 				text, r.centerx, r.centery, text_color, scale=self.reg_scale,
-				center=True, centery=True, **anim)
+				align='center', valign='center', **anim)
 		else:
 			self.font.scale(
 				text, r.centerx, r.centery, self.reg_scale,
-				text_color, center=True, centery=True)
+				text_color, align='center', valign='center')
 		return r
 
 	def _draw_dialog(self):
 		self._draw_background()
 		if self.patch:
+			self.patch.texture.alpha = self.alpha
 			self.patch.surround(self.area)
+		elif self.frame:
+			self._draw_frame()
+		self.rects = []
 		scale = self.text_scale
 		height = self.text_font.height * scale
 
 		y = self._draw_title()
-		x = self.area.left
+		x = self.area.left + self.spacingx
 
 		if self.text_anim:
 			for line in self.lines:
@@ -322,9 +370,13 @@ class Menu:
 	def _draw_input(self):
 		self._draw_background()
 		if self.patch:
+			self.patch.texture.alpha = self.alpha
 			self.patch.surround(self.area)
+		elif self.frame:
+			self._draw_frame()
 		x = self.area.centerx
 		y = self._draw_title()
+		self.rects = []
 		
 		r, x, max_width = self._draw_box(self.area.left, y)
 		y = r.centery
@@ -333,7 +385,9 @@ class Menu:
 			if self.font.width(self.textinput[part:], self.reg_scale) < max_width:
 				text = self.textinput[part:]
 				break
-		self.font.scale(text,x, y, self.reg_scale, self.box_textc, centery=True)
+		if self.cur_char:
+			text += char_map[self.cur_char % len(char_map)]
+		self.font.scale(text,x, y, self.reg_scale, self.box_textc, valign='center')
 
 		if self.buttons: 
 			self._draw_buttons()
@@ -341,7 +395,8 @@ class Menu:
 	def _draw_slider(self, y, option, i):
 		if self.selected == i:
 			if isinstance(self.box, NinePatch) and self.sel_patch:
-				y += self.but_padding[1] // 2
+				pass
+				#y += self.but_padding[1] // 2
 			self.changeable = option
 			color = self.sel_color
 		else:
@@ -354,10 +409,11 @@ class Menu:
 		value = (option['value'] - option['min']) / _range
 
 		if isinstance(self.box, NinePatch):
-			rect.width = self.area.right - rect.right - self.r_space
-			rect.right = self.area.right - self.r_space
+			rect.width = self.area.right - rect.right - self.r_space - self.spacingx
+			rect.right = self.area.right - self.r_space - self.spacingx
 			if self.selected == i and self.sel_patch:
-				rect.inflate_ip(0, self.but_padding[1])			
+				pass
+				#rect.inflate_ip(0, self.but_padding[1])			
 			self.rects.append(rect.copy())
 			color = self.press_color if self.selected == i else None
 			
@@ -374,11 +430,11 @@ class Menu:
 			scale = (rect.height - self.but_padding[1]) / self.font.height
 			self.font.scale(
 				str(option['value']), rect.centerx, rect.centery,
-				scale, color=self.box_textc, center=True, centery=True)
+				scale, color=self.box_textc, align='center', valign='center')
 
 		else:
-			rect.width = self.area.right - rect.right
-			rect.right = self.area.right
+			rect.width = self.area.right - rect.right - self.spacingx * 2
+			rect.right = self.area.right - self.spacingx
 			self.rects.append(rect.copy())
 			self._draw_box_slider(option, rect, value)
 
@@ -395,7 +451,7 @@ class Menu:
 				self.left.draw(dstrect=r)
 		self.font.scale(
 				label, self.area.x + self.l_space, rect.centery, self.reg_scale,
-				color=color, centery=True)
+				color=color, valign='center')
 
 		return rect.height
 
@@ -417,12 +473,12 @@ class Menu:
 			where = rect.left + thick
 			self.font.scale(
 				str(option['value']), where, rect.centery,
-				self.reg_scale, color=inner, centery=True)
+				self.reg_scale, color=inner, valign='center')
 		else:
 			where = rect.left + rect.width * value + thick
 			self.font.scale(
 				str(option['value']), where, rect.centery,
-				scale=self.reg_scale, color=outer, centery=True)
+				scale=self.reg_scale, color=outer, valign='center')
 
 
 	def _draw_option(self, x, y, option, i):
@@ -431,62 +487,106 @@ class Menu:
 		if _type == 'LABEL':
 			w = (self.area.right - self.r_space) - (self.area.left + self.l_space)
 			x = self.area.left + self.l_space + w//2
-			if self.anim:
-				return self.font.animate(
-					option['text'], x, y, scale=self.reg_scale, color=self.label,
-					center=True, **self.anim).height
+
+			text, _, split  = option['text'].partition('\t')
+			if split:
+				x = self.area.left + self.l_space
+				where = 'left'
 			else:
-				return self.font.scale(
-					option['text'], x, y, self.reg_scale, color=self.label,
-					center=True).height
+				x = self.area.left + self.l_space + w // 2
+				where = 'center'
+
+			scale = option.get('size', self.reg_scale)
+			color = option.get('color', self.label)
+			if self.anim:
+				height = self.font.animate(
+					text, x, y, scale, color=color,
+					align=where, **self.anim).height
+			else:
+				height = self.font.scale(
+					text, x, y, scale, color=color,
+					align=where).height
+			
+			if split:
+				x = self.area.right - self.r_space
+				if self.anim:
+					return self.font.animate(
+						split, x, y, scale, color=color,
+						align='right', **self.anim).height
+				else:
+					return self.font.scale(
+						split, x, y, scale, color=color,
+						align='right').height
+			return height
+
+
+		elif _type == 'SPACER':
+			return option['amount'] * self.font.height * self.reg_scale
 
 		elif _type == 'ITEM':
 			text = option['text']
+			rect = self.font.get_rect(text, x, y, self.reg_scale, True)
+
 			if self.sel_patch and self.selected == i:
-				y += self.but_padding[1] // 2
-				rect = self.font.get_rect(
-					text, x, y, self.reg_scale, True).inflate(*self.but_padding)
+				drect = rect.inflate(*self.but_padding)
 			else:
-				rect = self.font.get_rect(text, x, y, self.reg_scale, True)
+				drect = rect
 			stretched = rect.copy()
 			stretched.x = self.area.x + self.l_space
 			stretched.width = self.area.width - self.l_space - self.r_space
 			self.rects.append(stretched)
 
+			text, _, split  = option['text'].partition('\t')
 			if self.selected == i:
 				if self.left: # draw selection buttons
 					r = self.left.get_rect()
 					r.left = self.area.left
 					r.centery = rect.centery
+					self.left.alpha = self.alpha
 					self.left.draw(dstrect=r)
 				if self.right:
 					r = self.right.get_rect()
 					r.right = self.area.right
 					r.centery = rect.centery
-					self.left.draw(dstrect=r)
+					self.right.alpha = self.alpha
+					self.right.draw(dstrect=r)
 
 				self.rvalue = len(self.rects), text
 				if self.sel_patch:
-					if self.sel_stretch:
+					if self.sel_stretch or split:
 						rect = stretched
-					self.sel_patch.draw(rect)
-				if self.anim:
-					self.font.animate(
-						text, x, y, scale=self.reg_scale, center=True,
-						color=self.sel_color, **self.sel_anim).height
-				else:
-					self.font.scale(
-						text, x, y, self.reg_scale, center=True,
-						color=self.sel_color).height
+					self.sel_patch.texture.alpha = self.alpha
+					self.sel_patch.draw(drect)
+				color = self.sel_color
 			else:
+				color = self.color
+
+			if split:
+				x = self.area.left + self.l_space
+				where = 'left'
+			else:
+				x = stretched.centerx #self.area.left + self.l_space + w // 2
+				where = 'center'
+
+			if self.anim:
+				self.font.animate(
+					text, x, y, scale=self.reg_scale, align=where,
+					color=color, **self.anim).height
+			else:
+				self.font.scale(
+					text, x, y, scale=self.reg_scale, align=where,
+					color=color).height
+			if split:
+				x = self.area.right - self.r_space
 				if self.anim:
 					self.font.animate(
-						text, x, y, scale=self.reg_scale, center=True,
-						color=self.color, **self.anim).height
+						split, x, y, scale=self.reg_scale, align='right',
+						color=color, **self.anim).height
 				else:
 					self.font.scale(
-						text, x, y, self.reg_scale, color=self.color,
-						center=True).height
+						split, x, y, scale=self.reg_scale, align='right',
+						color=color).height
+
 			return rect.height
 
 		
@@ -496,41 +596,41 @@ class Menu:
 			options = option.get('options',('',))
 			text = pre + options[sel] + post
 			rect = self.font.get_rect(text, x, y, self.reg_scale, True)
+			irect = rect.inflate(*self.but_padding)
 			if self.sel_patch and self.selected == i:
-				y += self.but_padding[1] // 2
-				rect = rect = self.font.get_rect(text, x, y, self.reg_scale, True).inflate(*self.but_padding)
+				#y += self.but_padding[1] // 2
+				drect = irect
+				
 			else:
-				rect = self.font.get_rect(text, x, y, self.reg_scale, True)
+				drect = rect
 
 			stretched = rect.copy()
 			stretched.x = self.area.x + self.l_space
 			stretched.width = self.area.width - self.l_space - self.r_space
 			self.rects.append(stretched)
+			left = stretched.left
+			right = stretched.right
 
 			if self.opt_left and self.opt_right:
-				r = self.opt_left.get_rect()
+				r = self.opt_left.get_rect().fit(irect)
 				r.centery = rect.centery
-				r.left = self.area.left + self.l_space
+				r.left = self.area.left + self.l_space + self.spacingx
+				left = r.right + self.spacingx
+				self.opt_left.alpha = self.alpha
 				self.opt_left.draw(dstrect=r)
-				r.right = self.area.right - self.r_space
+				r.right = self.area.right - self.r_space - self.spacingx
+				right = r.left - self.spacingx
+				self.opt_right.alpha = self.alpha
 				self.opt_right.draw(dstrect=r)
 
-			x = stretched.centerx
 			if self.selected == i:
 				self.rvalue = len(self.rects), text
 				self.changeable = option
 				if self.sel_patch:
 					if self.sel_stretch and not self.opt_left and not self.opt_right:
 						rect = stretched
-					self.sel_patch.draw(rect)
-				if self.anim:
-					height = self.font.animate(
-						text, x, rect.centery, scale=self.reg_scale, center=True,
-						centery=True, color=self.sel_color, **self.anim).height
-				else:
-					height = self.font.scale(
-						text, x, y, self.reg_scale, center=True,
-						color=self.sel_color).height
+					self.sel_patch.draw(drect)
+				color = self.sel_color
 				if self.left:
 					r = self.left.get_rect()
 					r.centery = rect.centery
@@ -541,20 +641,45 @@ class Menu:
 					r.centery = rect.centery
 					r.right = self.area.right
 					self.right.draw(dstrect=r)
-
 			else:
+				color = self.color
+			
+			if pre.endswith('\t'):
+				pre = pre[:-1]
+				text = pre
+				x = left
+				where = 'left'
+				split = True
+			else:
+				x = stretched.centerx
+				where = 'center'
+				split = False
+
+			if self.anim:
+				height = self.font.animate(
+					text, x, y, scale=self.reg_scale, color=color,
+					align=where, **self.anim).height
+			else:
+				height = self.font.scale(
+					text, x, y, self.reg_scale, color = color,
+					align=where).height
+			if split:
+				text = options[sel]
 				if self.anim:
 					height = self.font.animate(
-						text, x, y, scale=self.reg_scale, color=self.color,
-						center=True, **self.anim).height
+						text, right, y, scale=self.reg_scale, color=color,
+						align='right', **self.anim).height
 				else:
 					height = self.font.scale(
-						text, x, y, self.reg_scale,
-						color=self.color, center=True).height
+						text, right, y, self.reg_scale, color = color,
+						align='right').height
+
 			height = rect.height
 			if self.opt_left:
 				height = max(height, self.opt_left.get_rect().height)
+				height = rect.height # FIX disabled pre fit icons
 			return height
+
 		elif _type == 'SLIDER':
 			return self._draw_slider(y, option, i)
 		return 0
@@ -564,7 +689,12 @@ class Menu:
 		self.rects = []
 		self._draw_background()
 		if self.patch:
+			self.patch.texture.alpha = self.alpha
 			self.patch.surround(self.area)
+		elif self.frame:
+			self._draw_frame()
+		#if self.sel_patch:
+		#	self.sel_patch.texture.alpha = self.alpha
 		x = self.area.centerx
 		y = self._draw_title()
 
@@ -577,12 +707,12 @@ class Menu:
 		if self.buttons:
 			self._draw_buttons()
 
-	def _draw_page_icons(self):
+	def _draw_page_icons(self, r):
 		y = self.area.top + (self.title_font.height * self.title_scale) / 2
 		x = self.area.left
 
 		if self.opt_left and self.opt_right:
-			rect = self.opt_left.get_rect()
+			rect = self.opt_left.get_rect().fit(r)
 			rect.left = self.area.left
 			rect.centery = y
 			self.opt_left.draw(dstrect=rect)
@@ -593,11 +723,11 @@ class Menu:
 
 		else:
 			left_icon = self.title_font.scale(
-				'<', x, y, self.title_scale, color=self.sel_color, centery=True)
+				'<', x, y, self.title_scale, color=self.sel_color, valign='center')
 			x = self.area.right
 			w = self.font.width('>', self.reg_scale)
 			right_icon = self.title_font.scale(
-				'>', x-w, y, self.title_scale, color=self.sel_color, centery=True)
+				'>', x-w, y, self.title_scale, color=self.sel_color, valign='center')
 			self.page_icons = left_icon, right_icon
 
 
@@ -606,12 +736,14 @@ class Menu:
 		scale = self.reg_scale
 		self._draw_background()
 		if self.patch:
+			self.patch.texture.alpha = self.alpha
 			self.patch.surround(self.area)
+			
+		elif self.frame:
+			self._draw_frame()
 
 		y = self._draw_title()
 		x = self.area.left + (self.area.width - self.l_space - self.r_space)/2
-		if options != self.items:
-			self._draw_page_icons()
 
 		for i, item in enumerate(options): # enumerate items
 			rect = self.font.get_rect(item, x, y, scale, True)
@@ -625,17 +757,17 @@ class Menu:
 
 			if i == self.selected: # handle selected item
 				if self.sel_patch:
-					rect.y	+= self.but_padding[1] // 2
-					rect.inflate_ip(*self.but_padding)
-					self.sel_patch.draw(rect)
+					r = rect.inflate(*self.but_padding)
+					#r.y	+= self.but_padding[1] // 2
+					self.sel_patch.draw(r)
 				if self.anim:
 					self.font.animate(
-						item, x, rect.centery, center=True, scale=scale,
-						color=self.sel_color, centery=True, **self.sel_anim)
+						item, x, rect.centery, align='center', scale=scale,
+						color=self.sel_color, valign='center', **self.sel_anim)
 				else:
 					self.font.scale(
-						item, x, rect.centery, scale, center=True,
-						color=self.sel_color, centery=True)
+						item, x, rect.centery, scale, align='center',
+						color=self.sel_color, valign='center')
 
 				if self.left: # draw selection buttons
 					r = self.left.get_rect()
@@ -651,28 +783,31 @@ class Menu:
 			else: # draw normal item
 				if self.anim:
 					rect = self.font.animate(
-						item, x, y, center=True, scale=scale, color=self.color,
+						item, x, y, align='center', scale=scale, color=self.color,
 						**self.anim)
 				else:
-					rect=self.font.scale(item, x, y, scale, center=True, color=self.color)
+					rect=self.font.scale(item, x, y, scale, align='center', color=self.color)
 			y += rect.height + self.spacing
+
+		if options != self.items:
+			self._draw_page_icons(r)
 
 
 	def _draw_title(self):
-		y = self.area.top
+		y = self.area.top - self.title_offset
 		if self.title:
 			w = (self.area.right - self.r_space) - (self.area.left + self.l_space)
 			x = self.area.left + self.l_space + w//2
 			if self.title_anim:
 				y += self.title_font.animate(
 					self.title, x, y,
-					scale=self.title_scale, center=True,
+					scale=self.title_scale, align='center',
 					color=self.title_color, **self.title_anim).height
 			else:
 				y += self.title_font.scale(self.title, x, y,
-				scale=self.title_scale, center=True, color=self.title_color).height
+				scale=self.title_scale, align='center', color=self.title_color).height
 
-		return y + self.spacing
+		return max(y, self.area.top) + self.spacing
 
 	def _get_box_size(self, x, y):
 		if isinstance(self.box, NinePatch):
@@ -689,7 +824,12 @@ class Menu:
 	def _get_input(self, events=None):
 		select = False
 		move = pg.Vector2()
-		events = events or pg.event.get()
+		if self.ignore_input:
+			self.ignore_input = False
+			return move, select, events
+	
+		if events == None:
+			events = pg.event.get()
 		for event in events:
 			if event.type == pg.QUIT and self.can_cancel:
 				select = -1
@@ -712,7 +852,9 @@ class Menu:
 					self._play_sound('bad')
 
 			elif event.type == pg.KEYDOWN:
-				if event.key == pg.K_UP:
+				if not self.rects and not self.buttons:
+					select = True
+				elif event.key == pg.K_UP:
 					move.y = -1
 				elif event.key == pg.K_DOWN:
 					move.y = 1
@@ -724,14 +866,15 @@ class Menu:
 					select = True
 				elif event.key == pg.K_SPACE and not self.editing:
 					select = True
-				elif event.key == (pg.K_ESCAPE) and self.can_cancel:
-					select = -1
+				elif event.key == (pg.K_ESCAPE) and	self.can_cancel:
+					if not self.first_shown:
+						select = -1
 				elif event.key == (pg.K_BACKSPACE):
 					self._play_sound('key')
 					self.textinput = self.textinput[:-1]
 
 			elif event.type == pg.MOUSEMOTION:
-				pointer = pg.mouse.get_pos()
+				pointer = self._get_mouse_pos()
 				for r in self.rects:
 					if r.collidepoint(pointer):
 						if self.selected != self.rects.index(r):
@@ -746,51 +889,79 @@ class Menu:
 							self._play_sound()	
 
 			elif event.type == pg.MOUSEBUTTONDOWN:
-				pointer = pg.mouse.get_pos()
+				pointer = self._get_mouse_pos()
 				if event.button == 1:
+					if self.page_icons:
+						left, right = self.page_icons
+						if left.collidepoint(pointer):
+							move.x = -1
+							continue
+						elif right.collidepoint(pointer):
+							move.x = 1
+							continue
+
 					if self.rects and self.rects[self.selected].collidepoint(pointer):
 						select = True
 					elif not self.area.collidepoint(pointer) and self.can_cancel:
 						select = -1
-					elif (self.but_rects and 
+					elif (self.buttons and  # changed from but_rects
 							self.but_rects[self.bselected].collidepoint(pointer)):
 						self.rvalue = self.buttons[self.bselected]
 						self.changeable = None
 						select = True
-
-				if self.page_icons:
-					left, right = self.page_icons
-					if left.collidepoint(pointer):
-						move.x = -1
-					elif right.collidepoint(pointer):
-						move.x = 1
+					elif not self.rects and not self.buttons:
+						select = True
 			
-			if self.joystick:
-				joystick, joy_sel, joy_cancel = self.joystick
-				x = int(joystick.get_axis(0) * 1.99) #copysign without math
-				y = int(joystick.get_axis(1) * 1.99)
-				if joystick.get_numhats() > 0:
-					x = x or joystick.get_hat(0)[0]
-					y = y or -joystick.get_hat(0)[1]
+		if self.joystick:
+			joystick, joy_sel, joy_cancel = self.joystick
+			joy_sel = joystick.get_button(joy_sel) or -joystick.get_button(joy_cancel)
+			x = int(joystick.get_axis(0) * 1.99) #copysign without math
+			y = int(joystick.get_axis(1) * 1.99)
+			if joystick.get_numhats() > 0:
+				x = x or joystick.get_hat(0)[0]
+				y = y or -joystick.get_hat(0)[1]
 
-				if (x or y):
-					if not self.joy_pressed:
-						move.x = move.x or x
-						move.y = move.y or y
-						self.joy_pressed = True
+			if joy_sel or x or y:
+				if not self.joy_pressed or (
+						self.joy_pressed > 20 and not self.joy_pressed % 10):
+					move.x = move.x or x
+					move.y = move.y or y
+					select = (
+						-joystick.get_button(joy_cancel) or
+						select or
+						joy_sel )
 				else:
-					self.joy_pressed = False
+					joy_sel = 0
+				self.joy_pressed += 1
+			
+			else:
+				self.joy_pressed = 0
 
-				select = (
-					-joystick.get_button(joy_cancel) or
-					select or
-					joystick.get_button(joy_sel) )
+			if self.editing:
+				if move.y:
+					if self.textinput and not self.cur_char:
+						self.cur_char = char_map.index(self.textinput[-1])
+					else:
+						self.cur_char = int(self.cur_char + move.y*-1)
+				if self.cur_char:
+					if select > 0:
+						self.textinput += char_map[self.cur_char % len(char_map)]
+						self.cur_char = joy_sel = select =  0
+				if joy_sel < 0 and len(self.textinput) > 0:
+					self.textinput = self.textinput[:-1]
+					self.cur_char = joy_sel = select =  0				
 
+		self.first_shown = False
 		self.page_icons = None #make sure it's cleared when unused
 		return move, select, events
 
 
 	def _get_mouse_pos(self):
+		x, y = pg.mouse.get_pos()
+		x = int(x * (self.viewport.w / self.window.size[0]))
+		y = int(y * (self.viewport.h / self.window.size[1]))
+		return (x, y)
+
 		x, y = pg.mouse.get_pos()
 		if self.target.target:
 			wx, wy = self.target.target.get_rect().size
@@ -810,12 +981,14 @@ class Menu:
 			if option['type'] in ('LABEL', 'ITEM'):
 				if 'text' not in option:
 					option['text'] = ''
-				width = max(self.font.width(option['text'], self.reg_scale), width)
+				scale = option.get('size', self.reg_scale)
+				width = max(self.font.width(option['text'], scale), width)
 			elif option['type'] == 'OPTION':
 				items = option.get('options', [])
 				pre, post = option.get('pre', ''), option.get('post', '')
 				for item in items:
 					if not isinstance(item, str):
+						print(item,str)
 						raise 'invalid option: {}'.format(option)		
 					width = max(
 						self.font.width(pre + item + post,
@@ -827,7 +1000,7 @@ class Menu:
 			width = max(wi, width)
 
 
-		return width
+		return width + self.spacingx*2
 
 	def _play_sound(self, which='good'):
 		sound = {
@@ -848,35 +1021,38 @@ class Menu:
 	def _process_options(self, options):
 		new_options = {}
 		if not isinstance(options, dict):
-			print('making orderdict')
 			options = OrderedDict(enumerate(options))
-			print(options)
 
 		for key, option in options.items():
 			if isinstance(option, dict):
 				_type = option.get('type')
-				if _type in ('OPTION', 'SLIDER', 'LABEL', 'ITEM'):
-					new_options[key] = option
-					#new_options.append(option)
+				if _type in ('OPTION', 'SLIDER', 'LABEL', 'ITEM', 'SPACER'):
+					new_options[key] = option.copy()
 				else:
 					print('option unprocessable by menu: ', option)
 			elif isinstance(option, str):
+				if option.endswith('\t'):
+					option += ' '
 				new_options[key] = dict(type='LABEL', text=option)
-				#new_options.append(dict(type='LABEL', text=option))
+			elif type(option) in (int, float, str):
+				new_options[key] = dict(type='SPACER', amount=option)
 			else:
 				try:
 					iter(option)
 				except:
 					continue
 				if len(option) == 1:
-					#new_options.append(dict(type='ITEM', text=option[0]))
 					new_options[key] = dict(type='ITEM', text=option[0])
 				else:
 					if isinstance(option[-1], tuple):
-						pre, post = option[-1]
+						if len(option[-1]) == 3:
+							pre, post, sel = option[-1]
+						else:
+							pre, post = option[-1]
+							sel = 0
 						new_options[key] = dict(
 							type='OPTION', options=option[:-1],
-							selected=0, pre=pre, post=post)
+							selected=sel, pre=pre, post=post)
 					else:
 						new_options[key] = dict(
 							type='OPTION', options=option, selected=0)
@@ -890,24 +1066,95 @@ class Menu:
 				option['step'] = option.get('step', 5)
 			elif option['type'] == 'OPTION':
 				option['value'] = option['options'][option['selected']]
+			elif option['type'] == 'SPACER':
+				amount = option.get('amount', 0.5)
+				try:
+					amount = float(amount)
+				except:
+					amount = 0.5
+				option['amount'] = amount
 		return new_options
 
+	def _modal_menu(self):
+		old_target = self.target.target
+		if old_target:
+			self.target.target = Menu.buffer
+			old_target.draw()
+		self.target.target = None
+
+		while self.alive:
+			Menu.buffer.draw()
+			rvalue = self.handle()
+			self.target.present()
+			self.clock.tick(30)
+
+		if old_target:
+			self.target.target = old_target
+			Menu.buffer.draw()
+		return rvalue
+
 	def _set_position(self):
-		self.area.center = self.viewport.center
-		if self.position in (1,4,7):
-			self.area.left = 0
-		if self.position in (1,2,3):
-			self.area.top = 0
-		if self.position in (3,6,9):
-			self.area.right = self.viewport.right
-		if self._set_position in (7,8,9):
-			self.area.bottom = self.viewport.bottom
+		self.first_shown = True
+		if self.patch:
+			xvar = (self.patch.left - self.patch.right) // 2
+			yvar = (self.patch.top - self.patch.bottom) // 2
+		else:
+			xvar = yvar = 0
+		self.area.centerx = self.viewport.centerx + xvar
+		self.area.centery = self.viewport.centery + yvar
+
+		if self.position == 'mouse':
+			self.area.center = pg.mouse.get_pos()
+			w, h = self.viewport.size
+			if self.patch:
+				self.area.left = max(self.patch.left, self.area.left)
+				self.area.top = max(self.patch.top, self.area.top)
+				self.area.right = min(w - self.patch.right, self.area.right)
+				self.area.bottom = min(h - self.patch.bottom, self.area.bottom)
+			else:
+				outl = self.frame[2] if self.frame else 0
+				self.area.left = max(outl, self.area.left)
+				self.area.top = max(outl, self.area.top)
+				self.area.right = min(w - outl, self.area.right)
+				self.area.bottom = min(h - outl, self.area.bottom)
+
+
+			'''eX = self.spacingx
+			eY = self.spacing * 2
+			area = self.area.copy()
+			if self.patch:
+				area = self.patch.surround(area, draw=False)
+			elif self.frame:
+				eX += self.frame[2] * 2
+				eY += self.frame[2] * 2
+			area.center = pg.mouse.get_pos()
+			area.clamp_ip(self.viewport.inflate(-eX, -eY))
+			self.area.center = area.center'''
+
+		elif self.patch:
+			if self.position in (1,4,7):
+				self.area.left = 0 + self.patch.left
+			if self.position in (1,2,3):
+				self.area.top = 0 + self.patch.top
+			if self.position in (3,6,9):
+				self.area.right = self.viewport.right - self.patch.right
+			if self.position in (7,8,9):
+				self.area.bottom = self.viewport.bottom - self.patch.bottom
+		else:
+			if self.position in (1,4,7):
+				self.area.left = 0
+			if self.position in (1,2,3):
+				self.area.top = 0
+			if self.position in (3,6,9):
+				self.area.right = self.viewport.right
+			if self.position in (7,8,9):
+				self.area.bottom = self.viewport.bottom
 
 
 
 	def dialog(
 			self, text, title, buttons=None, width=0,
-			can_cancel=True, modeless=False):
+			can_cancel=True, modeless=None, call_back=None):
 		"""
 		Display dialog with title, text, and up to 3 buttons
 
@@ -920,6 +1167,7 @@ class Menu:
 		"""
 		self.title = title
 		self.buttons = buttons
+		self.call_back=call_back
 		self.can_cancel = can_cancel
 		width = min(width or self.viewport.width, self.viewport.width * 0.9)
 
@@ -928,7 +1176,8 @@ class Menu:
 		if self.patch:
 			height -= self.patch.top + self.patch.bottom
 		if title:
-			height -= self.title_font.height * self.title_scale + self.spacing
+			title_height = max(self.title_font.height * self.title_scale - self.title_offset,0)
+			height -= title_height + self.spacing
 		if buttons:
 			height -= (self.font.height * self.reg_scale
 					+ self.spacing + self.but_padding[1])
@@ -937,24 +1186,21 @@ class Menu:
 		# Calculate actual height
 		height = (self.text_font.height*self.text_scale) * (len(self.lines))
 		if title:
-			height += self.title_font.height * self.title_scale + self.spacing
+			height += title_height + self.spacing
 		if buttons:
 			height += (self.font.height * self.reg_scale
 					+ self.spacing + self.but_padding[1])
 
-		self.area = pg.Rect(0, 0, width + self.spacing*2, height + self.spacing * 2)
+		self.area = pg.Rect(0, 0, width + self.spacingx*2, height + self.spacing * 2)
 		self._set_position()
 		self.rects = []
 		self.bselected = 0
 	
-		rvalue = None
-		self.handle = self._handle_dialog
+		self.ignore_input = True
 		self.alive = True
-		while self.alive and not modeless:
-			rvalue = self._handle_dialog()
-			self.target.present()
-			self.clock.tick(30)
-		return rvalue
+		self.handle = self._handle_dialog
+		if not modeless:
+			return self._modal_menu()
 
 	def _handle_dialog(self, events=None):
 		rvalue = None
@@ -972,16 +1218,25 @@ class Menu:
 			if move.y:
 				self._play_sound('bad')
 
-			if select:
-				self.alive = False
+			if select:	
 				if select >= 0:
-					rvalue = self.bselected, self.buttons[self.bselected]
+					rvalue = self.buttons[self.bselected]
+					self.alive = False
+					if self.call_back:
+						self.call_back(rvalue)
+				elif self.can_cancel:
+					rvalue = 'Done'
+					if self.call_back:
+						self.call_back(rvalue)
+					self.alive = False
+
 		return rvalue
 				
 
 	def input(
 			self, title, buttons=('Okay',), width=None, typ='string',
-			length=None, can_cancel=True, modeless=False):
+			length=None, can_cancel=True, modeless=False, call_back=None,
+		  default_text=''):
 		"""
 		Display single line text input dialog with up to 3 buttons
 
@@ -1001,6 +1256,8 @@ class Menu:
 		self.old_repeat = pg.key.get_repeat()
 		self.input_type = typ
 		self.input_length = length
+		self.call_back = call_back
+		self.cur_char = 0
 		pg.key.set_repeat(500, 100)
 
 		width = width or self.viewport.width * 0.75
@@ -1009,21 +1266,19 @@ class Menu:
 		height += (self.title_font.height * self.title_scale + self.spacing) * 1
 		height += self.but_padding[1] * 2
 
-		self.area = pg.Rect(0, 0, width + self.spacing*2, height + self.spacing)
+		self.area = pg.Rect(0, 0, width + self.spacingx*2, height + self.spacing)
 		self._set_position()
-		self.rects = []
+		self.rects = [pg.Rect(0,0,0,0)]
 
 		self.editing = True
-		self.textinput = ''
+		self.textinput = default_text
 		self._draw_input()
-		self.handle = self._handle_input
-		rvalue = None
+
+		self.ignore_input = True
 		self.alive = True
-		while self.alive and not modeless:
-			rvalue = self._handle_input()
-			self.target.present()
-			self.clock.tick(30)
-		return rvalue
+		self.handle = self._handle_input
+		if not modeless:
+			return self._modal_menu()
 
 	def _handle_input(self, events=None):
 		rvalue = None, None, None
@@ -1043,6 +1298,8 @@ class Menu:
 			if select:
 				self.alive = False
 				if select >= 0:
+					if self.joystick:
+						self.textinput = self.textinput.replace('_', ' ')
 					if self.input_type == 'int':
 						try:
 							self.textinput = int(self.textinput)
@@ -1054,6 +1311,8 @@ class Menu:
 						except:
 							self.textinput = float(0)
 					rvalue = self.textinput, self.bselected, self.buttons[self.bselected]
+				if self.call_back:
+					self.call_back(*rvalue)
 
 			if not self.alive:
 				self.editing = False
@@ -1062,17 +1321,19 @@ class Menu:
 
 	def select(
 			self, options, title=None, min_width=0,
-			can_cancel=True, modeless=False):
+			can_cancel=False, modeless=False, call_back=None):
 		"""
 		Display selection dialog that displays options in a vertical list. Long
 		lists will be broken into pages.
 
-		:param options: list of option strings
+		:param options: list of option dicts or convinience tuples
 		:param title: optional title string
 		:param width: optional minimum width but dialog may stretch to accomodate
-			longest option string
+				longest option string
 		:param can_cancel: can close menu without selecting a button by
 				escape key, pg.QUIT event, and clicking outside menu
+		:param call_back: call this function when an item is selected
+		:rtype index, string: the option selected as index and string
 		"""
 		key_repeat = pg.key.get_repeat()
 		pg.key.set_repeat(500, 250)
@@ -1080,6 +1341,9 @@ class Menu:
 		#title = title or 'page'
 		self.title = title or 'page'
 		self.can_cancel = can_cancel
+		self.call_back = call_back
+		self.buttons = None
+		self.but_rects = []
 		xspace = self.l_space + self.r_space 
 		height = 0
 
@@ -1091,9 +1355,12 @@ class Menu:
 		width = self.title_font.get_rect(self.title, 0,0, scale=self.title_scale).width
 		space = opt
 		width = max(width+space, min_width)
-		height = self.title_font.height * self.title_scale + self.spacing
+		height = self.spacing + max(0, 
+			 self.title_font.height * self.title_scale - self.title_offset)
 
 		max_height = self.viewport.height * 0.9 - height
+		if self.patch:
+			max_height -= self.patch.top + self.patch.bottom
 		self.max_items = int(max_height / (self.font.height * scale + self.spacing))
 		self.items = options
 		options = options[:self.max_items]
@@ -1106,20 +1373,16 @@ class Menu:
 		for item in options:
 			width = max(self.font.width(item, scale)+xspace, width)
 
-		self.area = pg.Rect(0, 0, width + self.spacing*2, height + self.spacing * 2)
+		self.area = pg.Rect(0, 0, width + self.spacingx*2, height + self.spacing * 2)
 		self._set_position()
 		self.rects = []
 		self.selected = 0
 	
-		self.handle = self._handle_select
-		rvalue = None
+		self.ignore_input = True
 		self.alive = True
-		while self.alive and not modeless:
-			rvalue = self._handle_select()
-			self.target.present()
-			self.clock.tick(30)
-
-		return rvalue
+		self.handle = self._handle_select
+		if not modeless:
+			return self._modal_menu()
 
 	def _handle_select(self, events=None):
 		if not self.alive:
@@ -1135,6 +1398,7 @@ class Menu:
 		else:
 			options = self.items
 
+		self._draw_select(options)
 		if move.y < 0:
 			self.selected -= 1
 			self._play_sound()
@@ -1160,8 +1424,8 @@ class Menu:
 				selected = (self.selected + (page*max_items)
 						if page > 0 else self.selected)
 				rvalue = selected, options[self.selected]
-
-		self._draw_select(options)
+			if self.call_back:
+				self.call_back(*rvalue)
 		return rvalue
 
 
@@ -1172,10 +1436,18 @@ class Menu:
 			if item['type'] == 'ITEM':
 				height += th + self.spacing
 			elif item['type'] == 'LABEL':
-				height += th + self.spacing
+				if item.get('size', None):
+					height += th * item['size'] + self.spacing
+				else:
+					height += th + self.spacing
 			elif item['type'] == 'OPTION':
 				opt = self.opt_left.get_rect().height if self.opt_left else 0
+				opt = th + self.spacing
+				#FIX I disabled the opt icon spacing and just fit them
+
 				height += max(th, opt) + self.spacing
+			elif item['type'] == 'SPACER':
+				height += item['amount'] * self.font.height * self.reg_scale
 			elif item['type'] == 'SLIDER':
 				if hasattr(self.box, 'min_height'):
 					height += max(th, self.box.min_height) + self.spacing
@@ -1184,18 +1456,60 @@ class Menu:
 		return height
 
 	def options(
-			self, options, title=None, buttons=None, width=0,
-			can_cancel=True, modeless=False):
+			self, options, title=None, buttons=('Okay', ), width=0,
+			can_cancel=True, modeless=False, call_back=None):
+		'''
+		Create an options menu featuring buttons, sliders, and toggles
+		:param options: list of option dicts or convenience tuples
+		:param title: text for title bar
+		:param buttons: bottom buttons such as okay, cancel
+		:param width: default width in pixels
+		:param can_cancel: if true menu may be closed without using bottom buttons
+		:param modeless: set false and menu will block until closed
+						set true and method returns immediately
+		:param call_back: function will be called when menu options change
+						call_back signature = menu(item, value, option_dict)
+		:rtype item, value, option_dict:
+
+		Available options include LABEL, ITEM, OPTION, SLIDER, and SPACER 
+		LABEL - Simple non-interactive text label 
+			type: 'LABEL' 
+			size(int, float)(opt): scalar to alter font size(.5 for half, 2 to double) 
+			color(3-tuple, pg.Color)(opt): font color 
+			shortcut: string 
+		ITEM - An item that can be clicked/selected
+			type: 'ITEM'
+			text(str): string to be displayed 
+			shortcut: (string,)
+		OPTION - multiple options of which one may be selected
+			type: 'OPTION'
+			options(list, tuple): list of strings, one for each option 
+			pre(str): a string displayed before the selected option's text
+			post(str): a string displayed after the selected option's text
+			selected(int): index of default/current selected option
+			shortcut: (option1, option2, etc, (pre, post, selected[optional])[optional]
+		OPTION - slider to select an int/float value within a range
+			type: 'SLIDER'
+			min(int, float): minimum value to be selected
+			max(int, float): maximum value to be selected
+			step(int, float): how much to increase/decrease value per button press
+			value(int): the default/current value of the slider
+			shortcut: None
+		SPACER - add some space between menu items to group them
+			type: 'SPACER'
+			amount(int, float): scalar for amount of space based on default font
+			shortcut: int, float
+		'''
 		self.can_cancel = can_cancel
 		self.title = title
 		self.buttons = buttons
-
-		items = self._process_options(options)
+		items = self._process_options(options.copy())
 		height = self._get_option_height(items)
 		_width = self._get_options_width(items) + self.but_padding[0]
 
 		if title:
-			height += self.title_font.height * self.title_scale + self.spacing
+			title_height = self.title_font.height * self.title_scale
+			height += max(title_height - self.title_offset, 0) + self.spacing 
 			_width = max(_width, self.title_font.width(title, self.title_scale))
 		if buttons:
 			h = self.but_padding[1] if self.sel_patch else 0
@@ -1203,6 +1517,7 @@ class Menu:
 			height += max(self.font.height * self.reg_scale + self.spacing, min_height) + h
 		_width += self.l_space + self.r_space
 		width = max(width, _width)
+		self.call_back = call_back
 
 		self.rects = []
 		self.area = pg.Rect(0, 0, width, height)
@@ -1212,14 +1527,16 @@ class Menu:
 		self.rvalue = None
 
 		self.items = items
-		self.handle = self._handle_options
+		self.keys = []
+		for k, v in self.items.items():
+			if v['type'] in ('ITEM', 'OPTION', 'SLIDER'):
+				self.keys.append(k)
+
+		self.ignore_input = True
 		self.alive = True
-		rvalue = None
-		while self.alive and not modeless:
-			rvalue = self._handle_options()
-			self.target.present()
-			self.clock.tick(30)
-		return rvalue, self.items
+		self.handle = self._handle_options
+		if not modeless:
+			return self._modal_menu()
 
 	def _handle_options(self, events=None):
 		rvalue = None
@@ -1228,7 +1545,7 @@ class Menu:
 			self._draw_options(options)
 			if self.buttons: # extra rect for bottom buttons
 				self.rects.append(pg.Rect(0,0,1,1)) 
-			move, select, events = self._get_input()
+			move, select, events = self._get_input(events)
 
 			if move.y < 0:
 				self.selected -= 1
@@ -1236,7 +1553,8 @@ class Menu:
 			elif move.y > 0:
 				self.selected += 1
 				self._play_sound()
-			self.selected = self.selected % len(self.rects)
+			if self.rects:
+				self.selected = self.selected % len(self.rects)
 
 			if move.x:
 				if self.buttons and self.selected == len(self.rects) - 1: 
@@ -1248,30 +1566,45 @@ class Menu:
 						self.bselected -= 1
 					self.bselected = self.bselected % len(self.but_rects)
 				else:
-					self._change_option(move.x)
+					rvalue = self.keys[self.selected], self._change_option(move.x), self.items
+					if rvalue and self.call_back:
+						self.call_back(*rvalue)
 
 			if select:
 				rvalue = None
 				if self.buttons and self.selected == len(self.rects) - 1:
-					rvalue = self.buttons[self.bselected]
+					rvalue = 'BUTTON', self.buttons[self.bselected], self.items
 					self.alive = False
 				elif select >= 0:
+					key = self.keys[self.selected]
 					if self.changeable:
-						self._change_option(1)
+						val = self._change_option(1)
+						rvalue = key, val, self.items
 					else:
-						rvalue = self.items[self.selected]['text']
+						sel = self.keys[self.selected]
+
+						rvalue = key, self.items[sel]['text'], self.items
 						self.alive = False
 				else:
 					self.alive = False
+				if rvalue and self.call_back:
+					self.call_back(*rvalue)
 		return rvalue
 
 	def set_background(self, background, tiled=False):
+		'''
+		Set background to draw behind modal menus. This does not effect
+		modeless menus that users must manually draw instead.
+
+		:param background: can be an image, texture, color, or callable
+			callables should be in form (function, args, kwargs)
+		:param tiled: set true to tile background image instead of stretching
+		'''
 		self.back_tiled = tiled
 		self.back_func = None
 		self.back_image = None
 		self.back_color = pg.Color(0, 0, 0)
 		self.draw_background = True if background or not self.patch else False
-
 
 		if isinstance(background, (Image, Texture)):
 			self.back_image = background
@@ -1303,5 +1636,146 @@ class Menu:
 			else:
 				self.target.draw_color = self.back_color
 				self.target.clear()
+
+	def _limit_string(self, text, font, scale, pre='_'):
+		w = font.get_rect('=', 0,0, scale).width
+		scr_w = self.viewport.w - self.spacingx * 2
+		if self.patch:
+			scr_w -= self.patch.left + self.patch.right
+		elif self.frame:
+			scr_w -= self.frame[2] * 2
+		max_chars = scr_w // w
+		if len(text) > max_chars:
+			return pre + text[-max_chars:]
+		return text
+
+	def get_max_options(self):
+		'''
+		calculate max number of options for option menu
+		that should fit on the current renderer
+		'''
+		items = ['test', ]
+		self.options(items, 'title', ('test',), modeless=True)
+		min_height = self.area.h
+		self.options(items*2, 'title', ('test',), modeless=True)
+		item_height = self.area.h - min_height
+		if self.patch:
+			min_height += self.patch.top + self.patch.bottom
+		return ((self.viewport.h - min_height) // item_height) - 1
+	def _get_file_list(self, path, show='both', allow='both'):
+		files = []
+		folders = []
+		parent = [('..',)] if show in ('folders', 'both') else []
+		sel_files = allow in ('files', 'both')
+		for f in os.listdir(path):
+			if show in ('folders', 'both'):
+				if os.path.isdir(os.path.join(path, f)):
+					folders.append(f+'/')
+			if show in ('files', 'both'):
+				if os.path.isfile(os.path.join(path, f)):
+					files.append(f)
+		
+		files.sort(key=lambda s: s.lower())
+		folders.sort(key=lambda s: s.lower())
+		if allow in ('files', 'both'):
+			files = [(f,) for f in files]
+		folders = [(f,) for f in folders]
+		
+		return parent + folders + files
+
+	def file_selector(self, path, show='both',
+			allow='both', call_back=None, allow_new=False):
+		'''
+		Opens a dialog where users may navigate the directory structure
+		and select a file or folder. 
+
+		:param path: directory where the dialog starts
+		:param show: show 'files', 'folders', or 'both.' Using folders
+				or both allows directory navigation
+		:param allow: allow 'file', 'folder', or 'both' to be selected
+		:param call_back: a function to be called when an file or
+				folder is selected. It should accept one string
+				parameter that will be the absolute path
+		:rvalue: returns the absolute path to the file or folder
+				as a string when selected(modal). Or None if a 
+				call_back is provided(modeless).
+		'''
+		def handle(key, sel, options):
+			path, items, pages, page, max_items = handle.info
+			if key == 1 and not handle.selected:
+				pager = options[1]
+				page = pager['selected']
+				cur_items = items[page*max_items:(page+1)*max_items]
+				items = [options[0], pager] + cur_items
+				self.options(items, self.title, ('Okay','Cancel'), 
+						call_back=handle, modeless=modeless, can_cancel=True)
+			elif type(sel) != str:
+				print('weird selector handle', key, sel)
+			elif sel in ('Okay', 'New'):
+				if sel == 'New':
+					new_folder, _, but = self.input('New Folder', 
+						('Okay', 'Cancel'), width=self.info_width)
+					if but == 'Okay':
+						path = os.path.join(path, new_folder)
+						if not os.path.exists(path):
+							os.mkdir(path)
+				if handle.selected and handle.files:
+					handle.selected = os.path.join(path, handle.selected)
+				else:
+					handle.selected = path
+				if handle.call_back:
+					call_back(handle.selected)
+			elif sel == 'Cancel':
+				handle.selected = None
+				if handle.call_back:
+					handle.call_back(None)
+			elif sel == '..':
+				if handle.selected:
+					handle.selected = None
+				else:
+					path = os.path.dirname(path.rstrip(os.sep))
+				handle.selected = self.file_selector(path,
+						show, allow,
+						handle.call_back, allow_new)
+			elif sel.endswith('/'):
+				path = os.path.join(path, sel)
+				return self.file_selector(path,
+						show, allow,
+						handle.call_back, allow_new)
+			else:
+				self.alive = True
+				handle.selected = sel
+				items = [('..',), (sel)]
+				self.options(items, self.title, ('Okay','Cancel'), 
+						call_back=handle, modeless=modeless, can_cancel=True)
+
+		handle.call_back = call_back
+		handle.selected = None
+		max_items = self.get_max_options()
+
+		page = 0
+		handle.files = allow in ('file', 'both')
+		items = self._get_file_list(path, show, allow)
+		pages = len(items) // (max_items-1)
+		cur_items = items[page*max_items:(page+1)*max_items]
+
+		psize = 0.77
+		_path = self._limit_string(path, self.font, psize)
+		dpath = dict(
+			type='LABEL', size=psize, color=self.title_color, text=_path)
+
+		pages = ['Page {}'.format(i+1) for i in range(pages+1)]
+		options = [dpath, pages + [('', '')]] + cur_items
+		handle.info = path, items, pages, page, max_items
+
+		modeless = True if call_back else False
+		self.position = 5
+		title = {'file': "Select File", 'folder': "Select Folder",
+				'both': 'Select File/Folder'}.get(allow, "Select File/Folder")
+		buttons = ('Okay', 'Cancel', 'New') if allow_new else ('Okay', 'Cancel')
+		self.options(options, title, buttons, 
+			call_back=handle, modeless=modeless, can_cancel=True)
+		result, handle.selected = handle.selected, None
+		return result
 
 

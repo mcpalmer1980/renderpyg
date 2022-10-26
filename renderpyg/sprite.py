@@ -22,6 +22,7 @@ License along with renderpyg.
 
 If not, see <http://www.gnu.org/licenses/>.
 '''
+from math import copysign
 import pygame as pg
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from .base import load_images, load_texture, fetch_images, load_xml_images
@@ -49,6 +50,7 @@ class GPUAniSprite(pg.sprite.Sprite):
 	groups provided pygame.
 	"""
 	loop_types = ('forward', 'back_forth')
+	max_velocity = 1000
 	def __init__(self, source, width=None, height=None, **kwargs):
 		"""
 		Create animated sprite object
@@ -104,9 +106,11 @@ class GPUAniSprite(pg.sprite.Sprite):
 		self.set_hitbox(kwargs.get('hitbox'))
 		self.set_transform(kwargs.get('transform'))
 		self.velocity = None
+		self.accel = None
 		self.rotation = None
 		self.scaling = None
 		self.clock = None
+		self.rect = self.images[0].get_rect()
 		self.set_frame(0)
 
 	def draw(self, dstrect=None):
@@ -316,18 +320,22 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.image = self.images[0]
 		self.duration = duration
 		self.angle = kwargs.get('angle', self.angle)
-		self.image.flipX = kwargs.get('flipx', False)
-		self.image.flipY = kwargs.get('flipy', False)
-		self.image.color = pg.color.Color(
-				kwargs.get('color', (255,255,255)))
-		self.image.alpha = pg.color.Color(
-				kwargs.get('alpha', 255))
+		self.image.flipX = kwargs.get('flipX', False)
+		self.image.flipY = kwargs.get('flipY', False)
+
+		color = kwargs.get('color', None)
+		if color:
+			self.image.color = color
+		self.image.alpha = kwargs.get('alpha', self.image.alpha)
+
 		if 'scale' in kwargs:
 			self.scale = kwargs['scale']
 		self.pos = kwargs.get('pos', pg.Vector2())
 		
 		if 'velocity' in kwargs:
 			self.velocity = kwargs['velocity']
+		if 'accel' in kwargs:
+			self.accel = kwargs['accel']
 		if 'rotation' in kwargs:
 			self.rotation = kwargs['rotation']
 		if 'scaling' in kwargs:
@@ -338,11 +346,11 @@ class GPUAniSprite(pg.sprite.Sprite):
 		if self.pos:
 			self.x, self.y = self.pos
 		self.dest_rect = self.image.get_rect()
-		if self.scale != 1:
+		'''if self.scale != 1:
 			c = self.dest_rect.center
 			self.dest_rect.width *= self.scale
 			self.dest_rect.height *= self.scale
-			self.dest_rect.center = c
+			self.dest_rect.center = c'''
 
 		self.dest_rect.x = self.x - self.transform[0] - self.anchor[0]
 		self.dest_rect.y = self.y - self.transform[1] - self.anchor[1]
@@ -352,9 +360,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.rect.x = (self.x + self.hit_anchor[0]
 				- self.transform[0] - self.anchor[0])
 			self.rect.y = (self.y + self.hit_anchor[1]
-				- self.transform[1] - self.anchor[1])
-		else:
-			self.rect = self.dest_rect
+				- self.transform[1] - self.anchor[1])		
+
 
 	def set_hitbox(self, box):
 		"""
@@ -393,7 +400,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.rect.y = (self.y + self.hit_anchor[1]
 				- self.transform[1] - self.anchor[1])
 		else:
-			self.rect = self.dest_rect
+			pass
+			#self.rect = self.dest_rect
 	
 	def set_transform(self, transform):
 		"""
@@ -431,24 +439,46 @@ class GPUAniSprite(pg.sprite.Sprite):
 			return
 		self.time_spent += delta
 		delta = delta / 1000
+
+		if self.accel:
+			self.velocity[0] += self.accel[0] * delta * self.speed
+			self.velocity[1] += self.accel[1] * delta * self.speed
+			#self.velocity = (
+			#		self.velocity[0] + self.accel[0] * delta * self.speed,
+			#		self.velocity[1] + self.accel[1] * delta * self.speed )
+
+
+			if abs(self.velocity[0]) > self.max_velocity:
+				self.velocity[0] = copysign(self.max_velocity, self.velocity[0])
+			if abs(self.velocity[1]) > self.max_velocity:
+				self.velocity[1] = copysign(self.max_velocity, self.velocity[1])
+
 		if self.velocity:
 			self.x += self.velocity[0] * delta * self.speed
 			self.y += self.velocity[1] * delta * self.speed
+
+		dest = self.image.get_rect()
+		dest.x = self.x - self.anchor[0]
+		dest.y = self.y - self.anchor[1]
+		#if self.hit_box:
+		#	pass
+
 		if self.rotation:
 			self.angle += self.rotation * delta * self.speed
 			self.image.angle = self.angle
 		if self.scaling:
 			self.scale += self.scaling * delta * self.speed
-			r = self.image.get_rect()
-			c = r.center
-			r.width *= self.scale
-			r.height *= self.scale
-			r.center = c
-			self.dest_rect = r
-			self.image.origin = r.width/2, r.height/2
+		if self.scale != 1:
+			c = dest.center
+			dest.width *= self.scale
+			dest.height *= self.scale
+			dest.center = c
 		if self.fading:
 			fading = self.fading * delta * self.speed
-			self.image.alpha = min(max(self.image.alpha-fading, 0), 255)
+			self.image.alpha = min(max(
+					self.image.alpha - fading, 0), 255)
+
+
 		self.dest_rect.x = self.x - self.transform[0] - self.anchor[0]
 		self.dest_rect.y = self.y - self.transform[1] - self.anchor[1]
 		if self.hit_anchor:
@@ -456,11 +486,14 @@ class GPUAniSprite(pg.sprite.Sprite):
 				- self.transform[0] - self.anchor[0])
 			self.rect.y = (self.y + self.hit_anchor[1]
 				- self.transform[1] - self.anchor[1])
-		else:
-			self.rect = self.dest_rect
-		
+
+		self.rect = dest
+		self.dest_rect = dest.move(-self.transform[0], -self.transform[1])
+
 		if self.duration and self.time_spent > abs(self.duration / self.speed):
 			self._next_frame()
+
+
 
 
 def keyfr(frame=0, duration=1000, **kwargs):
@@ -470,8 +503,8 @@ def keyfr(frame=0, duration=1000, **kwargs):
 	:param frame: name or number of image for this keyframe
 	:param duration: time in milliseconds for this keyframe
 	:param angle: degrees of clockwise rotation around a center origin
-	:param flipx: set True to flip image horizontally
-	:param flipy: set True flip image vertically
+	:param flipX: set True to flip image horizontally
+	:param flipY: set True flip image vertically
 	:param color: (r,g,b) triplet to shift color values
 	:param alpha: alpha transparency value
 	:param scale: scaling multiplier where 1.0 is unchanged

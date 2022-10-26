@@ -5,9 +5,9 @@
 
 Renderpyg is a python package that provides common game engine components for pygame. It utilize the experimental GPU accelerated texture renderer provided with pygame2 and will be updated to use the official sdl2.video API whenever it gets released. This version is written in pure python but later versions may be optimized in cython.
 
-The design of renderpyg is meant to be accessible by beginners so they may focus on game logic instead of the mechanics of tilemaps, sprite animation, and text rendering. This manual should provide new pygame users a effective guide to producing a simple game from start to finish. 
+The design of renderpyg is meant to be accessible by beginners so they may focus on game logic instead of the mechanics of tilemaps, sprite animation, and text rendering. This manual should provide new pygame users a effective guide to producing a simple game from start to finish.
 
-## Contents
+# Contents
 - Features
 - Installation Notes
 - Sprites
@@ -24,7 +24,7 @@ The design of renderpyg is meant to be accessible by beginners so they may focus
     * TextureFont
     * Tilemap
 
-## Features:
+# Features:
 - Hardware GPU renderering for HD graphics on most current hardware, with Rasberry Pi and Android support coming
 - Animated sprites with support keyframes, zooming, rotation, velocity, and more
 - Text rendering that uses the GPU to draw and animate fonts
@@ -32,10 +32,10 @@ The design of renderpyg is meant to be accessible by beginners so they may focus
 - Supports loading Tiled tilemaps with optional pytmx module by bitcraft
 - Load images from a TextureAtlas XML created with TexturePacker
 - Nine-patch rendering for smoothly scaling windows, buttons, and other UI features
-- Simple menuing system (soon)
+- Simple menuing system
 - Screen transitions (soon)
 
-## Installation Notes
+# Installation Notes
 Renderpyg requires python 3.5, pygame 2.0.0, and SDL 2.0 or later versions. It is designed for GPU rendering, so
 your operating system and hardware must support OpenGL, DirectX, or Vulkan acceleration with SDL2.
 
@@ -55,7 +55,7 @@ python -m renderpyg.examples - list all examples
 python -m renderpyg.examples sprites - run the sprites example
 ```
 
-## Sprites
+# Sprites
 The GPUAniSprite class is fully compatible with sprite groups and supports keyframe animation with transformations and cubic smoothing(soon). Basic usage is easy if you have a properly designed sprite sheet to use.
 
 You may load images from an XML file created with TexturePacker. You must save it into XML format, uncheck
@@ -78,7 +78,7 @@ for _ in range 1000:
     renderer.clear()
 ```
 
-## Textured Fonts
+# Textured Fonts
 The TextureFont class supports True Type Fonts (.ttf) that can be loaded by the pygame.font module. It loads the font into texture memory for fast drawing, with optional scaling, color shifting, and animation. It does not support kerning at this time.
 
 For best performance you should use as few textures as possible. Use TextureFont.multi_font() to load multiple fonts into the same texture.
@@ -96,7 +96,7 @@ for _ in range(1000):
     renderer.clear
 ```
 
-## Tilemaps
+# Tilemaps
 The Tilemap class can be used to draw tilemaps loaded from a Tiled tmx file or from a text string. Tilemaps support scrolling and zooming, and the camera can be used as a global transform that makes sure all of your other onscreen objects all draw in the right place.
 
 ![tilemap](./renderpyg/docs/tilemap.png)
@@ -114,7 +114,7 @@ for _ in range(1000):
     renderer.clear()
 ```
 
-## Nine Patches
+# Nine Patches
 The NinePatch class can smoothly scale specialy designed images that are very useful for buttons and dialog boxes.
 
 ![nine patch](./renderpyg/docs/nine.png)
@@ -126,6 +126,53 @@ nine.draw((10,10,200,200)
 renderer.present()
 ```
 
+# Menu  
+The Menu class can draw and handle menus that include informational dialogs, selection boxes, text input, and option screens. By default, the menus will be modal, handling its own input and drawing until the user makes their selection and then returning a value. Your program will halt during this time. Alternatively, you may pass the modeless=True flag and the menu will return right away. Use the menu.handle() method once per frame so the menu can draw and handle input.
+
+Start by loading the fonts and images that you wish to use for your menu, and then create a menu class with whatever options you want.
+
+```py
+font, title = TextureFont.multi_font(renderer, (
+    (EXAMPLE_DATA+'font.ttf', 32),
+    (EXAMPLE_DATA+'font2.ttf', 48)))
+
+menu = Menu(
+    renderer, font,
+    title_font=title, text_scale=.6)
+```
+
+There are five menus that can be used: dialog, input, select, option, and file_selector. You can let the menu handle events and process the results when they finish.
+
+```py
+results = menu.dialog("Will you press Okay or Cancel?", "Question", ('Okay', 'Cancel'))
+options = ["option #{}".format(i) for i in range(20)]
+results = menu.select(options, "Pick One")  
+```
+You may also handle events yourself if you prefer.
+
+```py
+options = (
+    "Label",
+    ("Item",),
+    ("Blue", "Red", "Green", ("Pick: ", "")),
+    dict(type="SLIDER", label="Percent", min=0, max=100, step=5)
+)
+def handler(*args):
+    print(args)
+menu.options(options, "Title", modeless=True, call_back=handler)
+
+while menu.alive:
+    events = pg.event.get()
+    for event in events:
+        if event.type == pg.QUIT:	
+            break
+    #Draw You Own Stuff
+    results = menu.handle(events)
+    renderer.present()
+    clock.tick(30)
+```
+
+# General Information
 ### Advantages of the new pygame GPU texture rendering API
 - Many times faster at rendering images
 - Can support HD graphics
@@ -151,7 +198,7 @@ renderer.present()
 - When you load an image with transparency, the texture will be set for alpha blending
 - If you create a texture yourself, you probably should set blendmode=1 for transparency
 
-### Basic Usage Example
+# Basic Usage Example
 
 ```py
 import os, sys, random, math
@@ -299,7 +346,8 @@ may wish to take extra consideration to aspect ratio in your own games.
         delta = clock.tick(FRAMES_PER_SECOND)
 ```
 
-### Base Functions
+# API Reference
+## Base Functions
 
 **fetch_images**(texture, width, height, spacing=0, margin=0, by_count=False)  
 Returns an image list generated from a given texture and either the
@@ -348,6 +396,19 @@ the name found in the xml file.
 - *rvalue*:  list of images as ordered in filename by default
 		optionally returns dict with image names instead
 
+**round_patch**(renderer, radius, color, sizes, colors)
+Generate a NinePatch object using a set of rounded rectangles of various
+thickness allowing multiple outlines of different colors. Useful for
+menus when you don't want to include a NinePatch image or use sharp
+cornered frames.
+
+- *renderer*  pygame._sdl2.video.Renderer to draw on
+- *radius*  radius of circular edges of the rounded rectangles
+- *color*  3-tuple or color object for the central area
+- *sizes*  list of int sizes of outline layers starting from the outside
+- *colors*  list of 3-tuples or color objects for each outline layer
+        starting from the outside
+
 **scale_rect**(rect, amount)  
 Return new Rect scaled by given multiplier where 1.0 is 100%
 
@@ -363,7 +424,7 @@ Scale given rect by given multiplier where 1.0 is 100%
 - *rvalue*:  Rect
 
 
-### GPUAniSprite Class  
+# GPUAniSprite Class  
 Class for rendering and animating game objects using the
 pygame._sdl2 GPU renderer. Retains compatability with the sprite
 groups provided pygame. May access through renderpy.Sprite()
@@ -381,9 +442,12 @@ Create animated sprite object
 - *by_count*:  set True to use width and height value to
             calculate frame size from width and height of spritesheet
 
-**draw**(self)  
-Render the sprite at its current position
-Use set_pos() and set_frame() modify where and how to draw it
+**draw**(self, dstrect=None)  
+Render the sprite at its current position or at the postion of dstrect.  
+Use set_pos() and set_frame() modify where and how to draw it.  
+Sprites will automatically animate if Sprite.clock references a time.Clock object.  
+
+- *dstrect*: draw at dstrect location (provides compatability with Images)
 
 **draw_debug**(self, color=(255, 255, 255, 255))  
 Render the sprite at its current position, showing collision
@@ -443,6 +507,15 @@ Start animation based on keyframe list and loop count
                     'forward', 'back_forth', 'reverse'
 - *rvalue None*: 
 
+**set_clock**(self, clock=None)
+Provide a pygame.time.Clock reference for automatic animation. Future
+Sprite.draw() calls will automatically call its update() method so
+you should not call it yourself. Use set_clock(None) to return to
+normal behavior
+
+- *clock*: reference to a pygame.time.Clock object  
+- *rvalue*: None  
+
 **set_frame**(self, frame=0, duration=0, **kwargs)  
 Set frame number and other parameters as generated by keyfr()
      
@@ -463,10 +536,10 @@ Set new sprite location and update rects for drawing and collision
 - *y*:  y cordinate if (x,y) pair and Vector2 not used
 - *rvalue None*: 
 
-**set_transform**(self, transform)  
+**set_transform**(self, transform)   
 Set camera and zoom transform to support a scrolling tilemap or background
      
-    :transform: (x,y,zoom) triplet or Vector3
+- *transform*: (x,y,zoom) triplet or Vector3
 - *rvalue None*: 
 
 **stop**(self)  
@@ -520,9 +593,233 @@ be set for each keyframe in the list.
 - *end*:  the last frame number for a range of frames used to
             build a list of keyframes that share the given parameter
 - *duration*:  time in milliseconds for every keyframe
+---
+# Menu Class
+Create simple graphical menus to select levels, changes options, and such.
+Once a menu object is created with various font and image settings, you
+may call the select(), dialog(), input(), or option() methods to open a
+menu. By default the menu will handle its own events and block execution
+of your game, but by passing the *modeless=True* parameter and calling 
+Menu.handle(events), it will process your event queue, draw itself, and
+then immediately return.
 
+There are many parameters that define how the menu will appear. You may pass them as arguments to the __init__ method upon creation, or change them afterwards by altering the attribute of the same name.  
+  
+---
+**init**(self, target, font, **kwargs):  
 
-### NinePatch Class  
+**REQUIRED**  
+
+- *target*: renderer to draw menu into  
+- *font*: default font to use  
+
+**OPTIONAL**  
+
+- *anim* : dict of parameters for animating default menu font  
+    It uses same parameters as the TextureFont.animate() method
+- *background*: optional Image, color, or callable for background  
+			callables should be a 3-tuple (func, args, kwargs)  
+- *color* :  (r,g,b) color for the default font 
+frame 
+- *joystick* : (joystick, but_select, but_cancel)  
+    Set to navigate menus with a joystick  
+- *label* : (r,g,b) color for label font used in option menu  
+- *patch* : NinePatch object to wrap around menu  
+    By default no background image is draw  
+title_offset
+
+- *position*: position of menu defaults to center  
+    uses numbers 1-9, with 1 at top-left corner and 9 at bottom right
+- *scale* : scaling multiplier for default font  
+- *spacing*: vertical spacing between menu items  
+
+---  
+
+- *box*: NinePatch object for text input and sliders  
+        or (outline color, fill color, outline thickness)  
+- *box_fill*: NinePatch object for filled area of sliders  
+    if image is smaller than box image, used as arrow mark on sliders instead  
+- *bot_textc*: color for text when using NinePatch for box
+
+---
+
+- *but_padding*: (x, y) padding for but_patch drawing
+- *but_patch*: NinePatch for button image and selected item in select menus
+- *press_color*: color modifier applied to patch of selected item
+- *press_patch*: NinePatch for selected item 
+        (overrides press_color )
+
+---
+
+- *opt_left*: image for left arrow in option list menus  
+        also used for page icons in multipage select menus
+- *opt_right*: image for right arrow in option list menus  
+        also used for page icons in multipage select menus
+    
+---
+
+- *sel_anim*: dict of parameters for animating selected items  
+    uses same parameters as TextureFont.animate() method
+- *sel_color*: font color for selected item
+- *sel_stretch*: stretch but_patch image across entire menu width
+- *sel_left*: int space at left side of menus  
+    or Image to draw at left of selected item (also effects spacing)
+- *sel_right*: int space at left side of menus  
+    or Image to draw at left of selected item (also effects spacing)
+
+---
+
+- *sound*: sound played when new item is selected
+    may be a pygame.Sound object or a 3-Tuple (func, args, kwargs)  
+- *sound_bad*: sound played after illegal input is detected  
+- *sound_key*: sound played for keys pressed during text input  
+
+---
+
+- *text_anim*: dict of parameters for animating dialog text
+as used in TextureFont.animate() method
+- *text_font*: optional font for dialog text
+- *text_scale*: scaling multiplier for dialog text
+
+---
+
+- *title_anim*: dict of parameters for animating menu titles
+as used in TextureFont.animate() method
+- *title_color*: color of title text
+- *title_font*: optional font for title
+- *title_scale*: scaling multiplier for title text
+
+**dialog**(text, title, buttons=None, width=0, can_cancel=True, modeless=False, call_back=None):  
+Display a dialog box with a text message and up to 3 buttons.
+
+- *title*: text for optional title bar  
+- *text*: text displayed in body of dialog box  
+- *buttons*: tuple including up to 3 strings for the buttons  
+- *width*: width in pixels for dialog box  
+- *can_cancel*: user can cancel without clicking a button if set True  
+    Pressing escape or clicking outside menu will cancel  
+- *modeless*: Set true to prevent the dialog from displaying immediately  
+You must call handle() each frame to draw dialog and handle input
+- *call_back*: function called when a button is pressed or the dialog is canceled. It should accept the same (int, string) parameters as the rvalue.
+- *rvalue*: (int index of button pressed, string of button pressed) or None if canceled  
+
+**file_selector**(path, show='both', allow='both', call_back=None, allow_new=False)
+
+Opens a dialog where users may navigate the directory structure and select a file or folder. 
+
+- *path*: directory where the dialog starts
+- *show*: show 'files', 'folders', or 'both.' Using folders
+        or both allows directory navigation
+- *allow*: allow 'file', 'folder', or 'both' to be selected
+- *call_back*: a function to be called when an file or
+        folder is selected. It should accept one string
+        parameter that will be the absolute path
+- *rvalue*: returns the absolute path to the file or folder
+        as a string when selected(modal). Or None if a 
+        call_back is provided(modeless).
+
+**handle**(events=None):  
+Call this method when you want your game to continue processing while a menu is displayed (such as an animated demo playing behind the menu). The menu will be displayed and events will be processed. If you do not send it the event queue it will try to retrieve it for you. Remember that it cannot retrieve events that have already been returned by a previous call to event.get().
+
+- *events*: optional list of events to process (event queue)  
+will call event.get() if no events are given  
+- *rvalue*: same as the dialog, input, option, or select method  
+
+**input**(title, buttons=('Okay',), width=None, type='string', length=None, can_cancel=True, modeless=False, call_back=None)    
+Display single line text input dialog with up to 3 buttons. A joystick may be used to enter characters by pressing up or down.
+
+- *title*: required string for title bar  
+- *buttons*: required tuple of strings for up to 3 buttons  
+- *width*: optional width for input dialog  
+    defaults to 75% of display width  
+- *type*: input types ('string', 'int', or 'float') not yet implemented  
+- *length*: optional limit for length of text input  
+- *can_cancel*: user can cancel without clicking a button if set True  
+    Pressing escape or clicking outside menu will cancel  
+- *modeless*: Set true to prevent the dialog from displaying immediately  
+You must call handle() each frame to draw dialog and handle input  
+- *call_back*: function called when a button is pressed or the dialog is canceled. It should accept the same (string, int) parameters as the rvalue.
+- *rvalue*: (string of text input, int index of button pressed, string of button presssed) or None of canceled  
+
+**options**(options, title=None, buttons=None, width=0, can_cancel=True, modeless=False, call_back=None)  
+Option menus can contain labels, options (horizontally scrolling lists), buttons, spacers, and slider controls. All options must fit on one screen as there are no scrolling or paging capabilities.  
+
+- *options*: dict (or list) of menu items  
+    A dict(or list) of dicts are are used to create option menus. Users can change the values of *option* lists and *sliders* by clicking them or using left/right arrows. Selecting an *item* will close the menu.
+
+    Each option in the options dict/list can be defined by a dict with the following key/value pairs. Convenience shortcuts are provided as alternatives.
+- *title*: text for optional title bar  
+- *buttons*: up to 3 optional buttons displayed at the bottom  
+- *width*: int value for the option dialog width
+- *can_cancel*: user can cancel without clicking a button if set True  
+    Pressing escape or clicking outside menu will cancel  
+- *modeless*: Set true to prevent the dialog from displaying immediately  
+You must call handle() each frame to draw dialog and handle input  
+- *call_back*: function called every time an option is changed or selected. It should accept the same (key, value, options) parameters as the rvalue.
+- *rvalue*: key, value, options dict  
+The key is either the key of your options dict or the index if you use a list. The value of the selected option is return, as well as the entire dict.
+
+Available options include LABEL, ITEM, OPTION, SLIDER, and SPACER
+
+**LABEL** Simple non-interactive text label
+
+- type: 'LABEL'
+- size(int, float)(opt): scalar to alter font size(.5 for half, 2 to double)
+- color(3-tuple, pg.Color)(opt): font color
+- *shortcut* string 
+
+**ITEM** An item that can be clicked/selected
+
+- type: 'ITEM'
+- text(str): string to be displayed 
+- *shortcut* (string,)
+
+**OPTION** Multiple options of which one may be selected
+
+- type: 'OPTION'
+- options(list, tuple): list of strings, one for each option 
+- pre(str): a string displayed before the selected option's text
+- post(str): a string displayed after the selected option's text
+- selected(int): index of default/current selected option
+- *shortcut* (option1, option2, etc, (pre, post, selected[optional])[optional]
+
+**SLIDER** Slider to select an int/float value within a range
+
+- type: 'SLIDER'
+- min(int, float): minimum value to be selected
+- max(int, float): maximum value to be selected
+- step(int, float): how much to increase/decrease value per button press
+- value(int): the default/current value of the slider
+- *shortcut* None
+
+**SPACER** Add some space between menu items to group them
+
+- type: 'SPACER'
+- amount(int, float): scalar for amount of space based on default font
+- *shortcut* int, float
+
+**select**(options, title=None, min_width=0,can_cancel=True, modeless=False, call_back=None):  
+Opens a menu with multiple text items to select from. If there are too many options to fit on one screen they will be split into multiple pages and icons will appear to near the top to turn pages(opt_left and opt_right icons will be used, or '<' '>' characters). Pressing the left and right keys will also turn pages.  
+
+- *options*: a list of strings to display  
+- *title*: text for optional title bar  
+- *min_width*: optional minimum width for selection menu  
+- *can_cancel*: user can cancel without clicking a button if set True  
+Pressing escape or clicking outside menu will cancel  
+- *modeless*: Set true to prevent the dialog from displaying immediately  
+You must call handle() each frame to draw dialog and handle input  
+- *call_back*: function to be called when an item is selected or the menu is canceled. It should accept the same (int, string) parameters as the rvalue.
+- *rvalue*: (int index of item selected, string of item selected) or None if canceled
+
+**set_background**(self, background, tiled=False):  
+Set background to draw behind modal menus. This does not effect
+modeless menus that users must manually draw instead.
+
+- *background*: can be an image, texture, color, or callable
+        callables should be in form (function, args, kwargs)
+- *tiled*: set true to tile background image instead of stretching
+
+# NinePatch Class  
 Nine Patch renderer for use with pygame._sdl2. Nine-patch images
 can be stretched to any size without warping the edge or corner
 sections.
@@ -608,7 +905,7 @@ Calculate width of given text not including motion or scaling effects
 - *rvalue*:  width of string in pixels
 
 
-### Tilemap Class
+# Tilemap Class
 Simple tilemap class available as replacement for the recommended
 pytmx module
  
@@ -700,7 +997,7 @@ Draw pytmx or inbuilt tilemap onto pygame GPU renderer
 - *clamp*:  True to adjust camera to fit world coordinates
 - *rvalue*:  (camx, camy, scale) for adjusting other images
 
-##Disclaimer
+# Disclaimer  
 Copyright (C) 2020, Michael C Palmer <michaelcpalmer1980@gmail.com>
 
 This file is part of renderpyg

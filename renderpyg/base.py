@@ -112,7 +112,7 @@ def load_xml_images(renderer, filename, _filter=[], by_name=False):
 	return names if by_name else numbers
 
 
-def load_texture(renderer, filename):
+def load_texture(renderer, filename, scale=None):
 	"""
 	Returns an texture loaded from given image file and attached to
 	given renderer.
@@ -126,6 +126,8 @@ def load_texture(renderer, filename):
 	except Exception as e:
 		raise FileNotFoundError('[Error] {}: cannot open: {}'.format(
 			type(e).__name__, filename))
+	if scale:
+		surf = pg.transform.smoothscale(surf, (surf.get_width()*scale, surf.get_height()*scale))
 	return Texture.from_surface(renderer, surf)
 
 
@@ -179,3 +181,11 @@ def scale_rect_ip(rect, amount):
 	rect.height *= amount
 	rect.center = c
 	return rect
+
+def sr(*args):
+	if hasattr(sr, 'amount'):
+		amount = sr.amount
+	else:
+		amount = args[-1]
+		args = args[:-1]
+	return [int(a*amount) for a in args]
