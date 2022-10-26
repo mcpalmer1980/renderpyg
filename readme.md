@@ -129,6 +129,8 @@ renderer.present()
 # Menu  
 The Menu class can draw and handle menus that include informational dialogs, selection boxes, text input, and option screens. By default, the menus will be modal, handling its own input and drawing until the user makes their selection and then returning a value. Your program will halt during this time. Alternatively, you may pass the modeless=True flag and the menu will return right away. Use the menu.handle() method once per frame so the menu can draw and handle input.
 
+![sprite sheet|%20](./renderpyg/docs/menu.png)
+
 Start by loading the fonts and images that you wish to use for your menu, and then create a menu class with whatever options you want.
 
 ```py
