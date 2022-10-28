@@ -91,8 +91,8 @@ def scale_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 		raise ValueError(
 			'render_tilemap() cannot parse "{}" as dest_rect'.format(dstrect))
 
-	tile_w = tilemap.tilewidth * scale
-	tile_h = tilemap.tileheight * scale
+	tile_w = int(tilemap.tilewidth * scale)
+	tile_h = int(tilemap.tileheight * scale)
 	cell_count = len(tilemap.images)
 	cells_wide = rend_width // tile_w + 2
 	cells_high = rend_height // tile_h + 2
@@ -101,6 +101,7 @@ def scale_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 	start_celly, offset_y = divmod(int(cam_y), tile_h)	
 
 	layer = tilemap.layers[0].data
+	dest_rect = pg.Rect(-offset_x, -offset_y, tile_w, tile_h) 
 
 	if 'background' in kwargs:
 		tile_background(renderer, kwargs['background'], (cam_x, cam_y), scale)
@@ -110,7 +111,6 @@ def scale_tilemap(tilemap, camera=(0,0), scale=1, **kwargs):
 
 	width = rend_width * scale
 	height = rend_height * scale
-
 
 	for row in layer[start_celly: start_celly + cells_high]:
 		for frame in row[start_cellx: start_cellx + cells_wide]:

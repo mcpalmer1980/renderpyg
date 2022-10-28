@@ -112,13 +112,14 @@ def sprites():
 			randrange(0, RENDER_RESOLUTION[0]),
 			randrange(0, RENDER_RESOLUTION[1]) )
 		spr.set_animation(random.choice(animations), -1)
-		#spr.velocity = pg.Vector2(
-		#	randrange(-20, 20),
-		#	randrange(-20, 20))
-		spr.scaling = 1.001
+		spr.velocity = pg.Vector2(
+			randrange(-20, 20),
+			randrange(-20, 20))
+		if randrange(10) < 2:
+			spr.scaling = 1.0001
 		
-		#if randrange(10) < 2:
-		#	spr.rotation = randrange(-10, 11)	
+		if randrange(10) < 2:
+			spr.rotation = randrange(-10, 11)	
 		group.add(spr)
 	""" 
 	Here starts a simple game loop
@@ -241,6 +242,7 @@ def tilemap():
 					scale -= 0.01
 
 		camera[2] = scale
+		
 		scale_tilemap(tilemap, camera, scale, center=False, clamp=True, background=background)
 		#group.update(delta)
 		#group.draw()
@@ -355,7 +357,7 @@ def nine():
 		patches[selected].draw(rect)
 		center = max(rect.centerx, tfont.width('Move or click mouse') // 2)
 		tfont.draw('Move or click mouse', center, rect.centery, color=(255,0,0),
-				center = True, centery=True)
+				align='center', valign='center')
 
 		renderer.present()
 		clock.tick(30)
@@ -389,7 +391,6 @@ def menu():
 	from renderpyg import fetch_images, NinePatch, Menu, keyframes
 
 	os.environ['SDL_RENDER_SCALE_QUALITY'] = '2'
-	EXAMPLE_DATA = os.path.join(os.path.dirname(__file__), 'data', '')
 
 	pg.init()
 	clock = pg.time.Clock()

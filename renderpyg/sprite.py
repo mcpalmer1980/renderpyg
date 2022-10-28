@@ -345,12 +345,14 @@ class GPUAniSprite(pg.sprite.Sprite):
 
 		if self.pos:
 			self.x, self.y = self.pos
-		self.dest_rect = self.image.get_rect()
-		'''if self.scale != 1:
-			c = self.dest_rect.center
-			self.dest_rect.width *= self.scale
-			self.dest_rect.height *= self.scale
-			self.dest_rect.center = c'''
+		self.dest_rect = getattr(self, 'dest_rect', self.image.get_rect())  
+		#if self.scale != 1:
+			#self.dest_rect.inflate_ip(
+			#	dest.w * self.scale, dest.h * self.scale)
+			#c = self.dest_rect.center
+			#self.dest_rect.width *= self.scale
+			#self.dest_rect.height *= self.scale
+			#self.dest_rect.center = c
 
 		self.dest_rect.x = self.x - self.transform[0] - self.anchor[0]
 		self.dest_rect.y = self.y - self.transform[1] - self.anchor[1]
@@ -439,6 +441,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 			return
 		self.time_spent += delta
 		delta = delta / 1000
+		if self.duration and self.time_spent > abs(self.duration / self.speed):
+			self._next_frame()
 
 		if self.accel:
 			self.velocity[0] += self.accel[0] * delta * self.speed
@@ -469,30 +473,26 @@ class GPUAniSprite(pg.sprite.Sprite):
 		if self.scaling:
 			self.scale += self.scaling * delta * self.speed
 		if self.scale != 1:
-			c = dest.center
-			dest.width *= self.scale
-			dest.height *= self.scale
-			dest.center = c
+			dest.inflate_ip(
+				dest.w * self.scale, dest.h * self.scale)
+
 		if self.fading:
 			fading = self.fading * delta * self.speed
 			self.image.alpha = min(max(
 					self.image.alpha - fading, 0), 255)
 
-
+		'''
+		self.dest_rect = dest # WTF DOUBLED
 		self.dest_rect.x = self.x - self.transform[0] - self.anchor[0]
 		self.dest_rect.y = self.y - self.transform[1] - self.anchor[1]
 		if self.hit_anchor:
 			self.rect.x = (self.x + self.hit_anchor[0]
 				- self.transform[0] - self.anchor[0])
 			self.rect.y = (self.y + self.hit_anchor[1]
-				- self.transform[1] - self.anchor[1])
+				- self.transform[1] - self.anchor[1])'''
 
 		self.rect = dest
 		self.dest_rect = dest.move(-self.transform[0], -self.transform[1])
-
-		if self.duration and self.time_spent > abs(self.duration / self.speed):
-			self._next_frame()
-
 
 
 

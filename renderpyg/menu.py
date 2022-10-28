@@ -597,6 +597,7 @@ class Menu:
 			text = pre + options[sel] + post
 			rect = self.font.get_rect(text, x, y, self.reg_scale, True)
 			irect = rect.inflate(*self.but_padding)
+			
 			if self.sel_patch and self.selected == i:
 				#y += self.but_padding[1] // 2
 				drect = irect
@@ -612,7 +613,7 @@ class Menu:
 			right = stretched.right
 
 			if self.opt_left and self.opt_right:
-				r = self.opt_left.get_rect().fit(irect)
+				r = self.opt_left.get_rect().fit(rect)
 				r.centery = rect.centery
 				r.left = self.area.left + self.l_space + self.spacingx
 				left = r.right + self.spacingx
@@ -623,12 +624,26 @@ class Menu:
 				self.opt_right.alpha = self.alpha
 				self.opt_right.draw(dstrect=r)
 
+			if pre.endswith('\t'):
+				pre = pre[:-1]
+				text = pre
+				x = left
+				where = 'left'
+				split = True
+				stretched.x = left
+				stretched.w = right - left
+			else:
+				x = stretched.centerx
+				where = 'center'
+				split = False
+
 			if self.selected == i:
 				self.rvalue = len(self.rects), text
 				self.changeable = option
 				if self.sel_patch:
-					if self.sel_stretch and not self.opt_left and not self.opt_right:
-						rect = stretched
+					if split or (self.sel_stretch and not self.opt_left
+							and not self.opt_right):
+						drect = stretched
 					self.sel_patch.draw(drect)
 				color = self.sel_color
 				if self.left:
@@ -644,17 +659,6 @@ class Menu:
 			else:
 				color = self.color
 			
-			if pre.endswith('\t'):
-				pre = pre[:-1]
-				text = pre
-				x = left
-				where = 'left'
-				split = True
-			else:
-				x = stretched.centerx
-				where = 'center'
-				split = False
-
 			if self.anim:
 				height = self.font.animate(
 					text, x, y, scale=self.reg_scale, color=color,
