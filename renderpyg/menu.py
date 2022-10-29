@@ -993,7 +993,7 @@ class Menu:
 				for item in items:
 					if not isinstance(item, str):
 						print(item,str)
-						raise 'invalid option: {}'.format(option)		
+						raise ValueError('invalid option: {}'.format(option))
 					width = max(
 						self.font.width(pre + item + post,
 						self.reg_scale)+opt_width, width)
