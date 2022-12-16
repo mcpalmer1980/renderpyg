@@ -474,7 +474,7 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.scale += self.scaling * delta * self.speed
 		if self.scale != 1:
 			dest.inflate_ip(
-				dest.w * self.scale, dest.h * self.scale)
+				dest.w * (self.scale-1), dest.h * (self.scale-1))
 
 		if self.fading:
 			fading = self.fading * delta * self.speed

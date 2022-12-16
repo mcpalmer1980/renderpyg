@@ -1084,13 +1084,20 @@ class Menu:
 		if old_target:
 			self.target.target = Menu.buffer
 			old_target.draw()
-		self.target.target = None
+			self.target.target = old_target
 
 		while self.alive:
 			Menu.buffer.draw()
 			rvalue = self.handle()
+
+			if old_target:
+				self.target.target = None
+				old_target.draw()
+
 			self.target.present()
 			self.clock.tick(30)
+			if old_target:
+				self.target.target = old_target
 
 		if old_target:
 			self.target.target = old_target
