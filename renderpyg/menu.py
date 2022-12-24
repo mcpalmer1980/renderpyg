@@ -630,6 +630,7 @@ class Menu:
 				x = left
 				where = 'left'
 				split = True
+				stretched = stretched.copy()
 				stretched.x = left
 				stretched.w = right - left
 			else:
