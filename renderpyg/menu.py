@@ -919,7 +919,7 @@ class Menu:
 			
 		if self.joystick:
 			joystick, joy_sel, joy_cancel = self.joystick
-			joy_sel = joystick.get_button(joy_sel) or -joystick.get_button(joy_cancel)
+			joy_sel = joystick.get_button(joy_sel) or joystick.get_button(joy_cancel)
 			x = int(joystick.get_axis(0) * 1.99) #copysign without math
 			y = int(joystick.get_axis(1) * 1.99)
 			if joystick.get_numhats() > 0:
@@ -931,10 +931,11 @@ class Menu:
 						self.joy_pressed > 20 and not self.joy_pressed % 10):
 					move.x = move.x or x
 					move.y = move.y or y
-					select = (
-						-joystick.get_button(joy_cancel) or
-						select or
-						joy_sel )
+					if joystick.get_button(joy_cancel):
+						if self.can_cancel:
+							select = -1
+					else:
+						select = select or joy_sel
 				else:
 					joy_sel = 0
 				self.joy_pressed += 1
