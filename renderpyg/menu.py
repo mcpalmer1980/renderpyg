@@ -29,6 +29,7 @@ from .tfont import NinePatch, TextureFont, char_map
 from .base import load_texture, scale_rect, fetch_images
 from .tilemap import tile_background
 from collections import OrderedDict
+AXIS_MOD = 2 ** 15
 
 class Menu:
 	buffer = None
@@ -187,7 +188,7 @@ class Menu:
 		self.viewport = target.get_viewport()
 		self.window = kwargs.get('window', self.viewport)
 
-		self.editing = False
+		self.editing = 0
 		self.selected = self.bselected = 0
 		self.joy_pressed = False
 		self.alive = False
@@ -380,13 +381,15 @@ class Menu:
 		
 		r, x, max_width = self._draw_box(self.area.left, y)
 		y = r.centery
-		text = self.textinput or '?'
+		text = self.textinput or ''
 		for part in range(len(self.textinput)):
 			if self.font.width(self.textinput[part:], self.reg_scale) < max_width:
 				text = self.textinput[part:]
 				break
-		if self.cur_char:
-			text += char_map[self.cur_char % len(char_map)]
+		if self.editing % 15 < 10:
+			if self.cur_char:
+				text += char_map[self.cur_char % len(char_map)]
+			else: text += '?'
 		self.font.scale(text,x, y, self.reg_scale, self.box_textc, valign='center')
 
 		if self.buttons: 
@@ -916,23 +919,30 @@ class Menu:
 						select = True
 					elif not self.rects and not self.buttons:
 						select = True
+
 			
 		if self.joystick:
 			joystick, joy_sel, joy_cancel = self.joystick
-			joy_sel = joystick.get_button(joy_sel) or joystick.get_button(joy_cancel)
-			x = int(joystick.get_axis(0) * 1.99) #copysign without math
-			y = int(joystick.get_axis(1) * 1.99)
-			if joystick.get_numhats() > 0:
-				x = x or joystick.get_hat(0)[0]
-				y = y or -joystick.get_hat(0)[1]
+			joy_sel = joystick.get_button(joy_sel) or -joystick.get_button(joy_cancel)
+
+			x = int(joystick.get_axis(0) / AXIS_MOD * 1.99) #copysign without math
+			y = int(joystick.get_axis(1) / AXIS_MOD * 1.99)
+			if joystick.get_button(pg.CONTROLLER_BUTTON_DPAD_UP):
+				y = -1
+			elif joystick.get_button(pg.CONTROLLER_BUTTON_DPAD_DOWN):
+				y = 1
+			if joystick.get_button(pg.CONTROLLER_BUTTON_DPAD_LEFT):
+				x = -1
+			elif joystick.get_button(pg.CONTROLLER_BUTTON_DPAD_RIGHT):
+				x = 1
 
 			if joy_sel or x or y:
 				if not self.joy_pressed or (
-						self.joy_pressed > 20 and not self.joy_pressed % 10):
+						self.joy_pressed > 20 and not self.joy_pressed % 5):
 					move.x = move.x or x
 					move.y = move.y or y
 					if joystick.get_button(joy_cancel):
-						if self.can_cancel:
+						if self.can_cancel or self.editing:
 							select = -1
 					else:
 						select = select or joy_sel
@@ -944,18 +954,27 @@ class Menu:
 				self.joy_pressed = 0
 
 			if self.editing:
+				self.editing += 1
 				if move.y:
-					if self.textinput and not self.cur_char:
+					if self.textinput and self.cur_char == None:
 						self.cur_char = char_map.index(self.textinput[-1])
 					else:
-						self.cur_char = int(self.cur_char + move.y*-1)
+						cc = self.cur_char or 0
+						self.cur_char = int(cc + move.y*-1)
 				if self.cur_char:
-					if select > 0:
+					if select > 0 or move.x > 0:
 						self.textinput += char_map[self.cur_char % len(char_map)]
-						self.cur_char = joy_sel = select =  0
-				if joy_sel < 0 and len(self.textinput) > 0:
+						self.cur_char = None
+						joy_sel = select =  0
+				elif move.x > 0:
+					self.textinput += ' '
+					self.cur_char = None
+					joy_sel = select =  0
+				if (joy_sel < 0 or move.x < 0) and len(self.textinput) > 0:
 					self.textinput = self.textinput[:-1]
-					self.cur_char = joy_sel = select =  0				
+					self.cur_char = None
+					joy_sel = select =  0
+				select = max(select, 0)			
 
 		self.first_shown = False
 		self.page_icons = None #make sure it's cleared when unused
@@ -1276,7 +1295,7 @@ class Menu:
 		self.input_type = typ
 		self.input_length = length
 		self.call_back = call_back
-		self.cur_char = 0
+		self.cur_char = None
 		pg.key.set_repeat(500, 100)
 
 		width = width or self.viewport.width * 0.75
@@ -1289,7 +1308,7 @@ class Menu:
 		self._set_position()
 		self.rects = [pg.Rect(0,0,0,0)]
 
-		self.editing = True
+		self.editing = 1
 		self.textinput = default_text
 		self._draw_input()
 
@@ -1334,7 +1353,7 @@ class Menu:
 					self.call_back(*rvalue)
 
 			if not self.alive:
-				self.editing = False
+				self.editing = 0
 				pg.key.set_repeat(*self.old_repeat)
 		return rvalue
 

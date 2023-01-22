@@ -28,7 +28,7 @@ import pygame.gfxdraw
 from pygame._sdl2 import Window, Renderer, Texture, Image
 from .base import load_texture
 
-char_map = ''' _ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,?!-:'"=+<>~@/\\|(%)'''
+char_map = ''' ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,?!-:'"_=+<>~@/\\|(%)'''
 class TextureFont():
 	'''
 	Font renderer for use with pygame._sdl2
