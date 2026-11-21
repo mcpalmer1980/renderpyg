@@ -1,4 +1,4 @@
-from setuptools import setup
+import setuptools
 
 import os
 def package_files(root, sub):
