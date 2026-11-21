@@ -320,8 +320,8 @@ class GPUAniSprite(pg.sprite.Sprite):
 			self.image = self.images[0]
 		self.duration = duration
 		self.angle = kwargs.get('angle', self.angle)
-		self.image.flipX = kwargs.get('flipX', False)
-		self.image.flipY = kwargs.get('flipY', False)
+		self.image.flip_x = kwargs.get('flipX', False)
+		self.image.flip_y = kwargs.get('flipY', False)
 
 		color = kwargs.get('color', None)
 		if color:
